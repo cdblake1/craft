@@ -1,0 +1,19 @@
+{
+  "name": "craft",
+  "owner": {
+    "name": "Caleb Blake",
+    "email": "calebblake@microsoft.com"
+  },
+  "metadata": {
+    "description": "Marketplace hosting craft. Microsoft-internal use; not for public marketplace listings.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "craft",
+      "description": "Opinionated engineering-discipline workflows for Copilot CLI. v0.1 ships the Implementation workflow (aim, design, deliver in validated slices), validated to move agent behavior toward tested incremental delivery.",
+      "version": "0.1.0",
+      "source": "./plugins/craft"
+    }
+  ]
+}
