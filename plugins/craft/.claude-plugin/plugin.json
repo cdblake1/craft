@@ -1,7 +1,7 @@
 {
   "name": "craft",
   "description": "Opinionated engineering-discipline workflows for Copilot CLI. v0.1: the Implementation workflow -- build a non-trivial change with discipline (aim, design, deliver in validated tested slices). Host-agnostic; Microsoft-internal use. See README.md.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Caleb Blake",
     "email": "calebblake@microsoft.com"

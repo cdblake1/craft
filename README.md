@@ -8,7 +8,7 @@ craft encodes *how* to do serious engineering work well: aim before you fire, th
 
 One workflow: **Implementation**, build a non-trivial change with discipline.
 
-1. **Aim** — frame the goal and surface assumptions before coding.
+1. **Aim** — align on the real requirement: echo it back, probe the gaps (Mom Test + Socratic), converge on testable acceptance criteria.
 2. **Design** — when there is a real choice, weigh an alternative and its trade-off first (skip-gated).
 3. **Deliver in validated slices** — build in thin vertical slices, test-first, never accumulating untested code. *This is the core.*
 
@@ -24,7 +24,7 @@ craft's contents are chosen by evidence, not taste. The Implementation workflow 
 | Design with an alternative + trade-off | 0/9 | 3/9 | real but modest |
 | Aim / surface assumptions | 9/9 | 9/9 | no measured separation* |
 
-\* The aim stage showed no separation in a *non-interactive* harness, which cannot exercise interactive intent-clarification. It is kept (an unfair test is not a verdict), but deliberately lightweight.
+\* The aim stage showed no separation in a *non-interactive* harness, which cannot exercise interactive intent-clarification. It is kept because it aligns requirements with a human in the loop, the case the A/B could not test, and now carries a researched interactive methodology (the Mom Test + Socratic questioning, converging on Given/When/Then acceptance criteria).
 
 So the workflow leads with delivery-in-slices, keeps design as a gated secondary, and treats aim as a quick frame. Full method and results: `copilot-tools/experiments/craft-impl-validation/` (`verdict.md`, `verdict-t2.md`).
 

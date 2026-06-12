@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Marketplace hosting craft. Microsoft-internal use; not for public marketplace listings.",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "plugins": [
     {
       "name": "craft",
       "description": "Opinionated engineering-discipline workflows for Copilot CLI. v0.1 ships the Implementation workflow (aim, design, deliver in validated slices), validated to move agent behavior toward tested incremental delivery.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "source": "./plugins/craft"
     }
   ]
