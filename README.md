@@ -1,32 +1,52 @@
 # craft
 
-**Opinionated engineering-discipline workflows for GitHub Copilot CLI.** Microsoft-internal.
+**Opinionated engineering-discipline tooling for GitHub Copilot CLI.** Microsoft-internal.
 
-craft encodes *how* to do serious engineering work well: aim before you fire, then deliver in validated slices. It ships **workflows**, composite, opinionated recipes for an engineering activity, rather than a grab-bag of tips.
+craft encodes *how* to do serious engineering work well and gives a session the substrate to do it: workflow skills that shape behavior, two MCP servers for continuity and work composition, and lifecycle hooks that surface the right context at the right moment. Everything sits on one git-backed data layer that can follow you across machines.
 
-## v0.1: the Implementation workflow
+## What's in it
 
-One workflow: **Implementation**, build a non-trivial change with discipline.
+| Component | What it does |
+|---|---|
+| **`implementation` skill** | Build a non-trivial change with discipline: aim, then design, then deliver in validated tested slices. Behavior-validated (see below). |
+| **`decompose` skill** | The judgment layer for the compose MCP: how to break a goal into the roadmap, plan, item hierarchy (leveling, how many per pass, when to stop). |
+| **`craft-journal` MCP** | Resume continuity and findings reuse. Relevance-ranked (BM25) search over prior findings, per-branch plan and step-log, draft seeding. 9 tools. |
+| **`craft-compose` MCP** | Roadmap, plan, item work composition. Create and link nodes, status, deterministic roll-up, the unified tree. Write-time PII guard. 7 tools. |
+| **Node hook dispatcher** | Runs the lifecycle handlers in an explicit, ordered registry across `sessionStart`, `postToolUse`, `postToolUseFailure`, and `sessionEnd`. |
+| **Storage adapter + sync** | One git-backed adapter under both MCPs and every hook; opt-in session-boundary sync across machines. |
 
-1. **Aim** — align on the real requirement: echo it back, probe the gaps (Mom Test + Socratic), converge on testable acceptance criteria.
-2. **Design** — when there is a real choice, weigh an alternative and its trade-off first (skip-gated).
-3. **Deliver in validated slices** — build in thin vertical slices, test-first, never accumulating untested code. *This is the core.*
+## Architecture
 
-It triggers on ordinary asks like "implement X", "build this", "add this feature".
+Everything addresses data through a single storage adapter (`lib/storage.js`), by a logical, slash-separated key, never the filesystem directly. The journal and compose MCPs and every hook share that one data layer, so persistence and cross-machine sync are solved once, in one place. The default backend is a git-backed directory; the interface is deliberately small so a future multi-user backend can replace it without rewriting the layers above. The full design is in [`docs/design/0001-foundation-and-work-composition.md`](docs/design/0001-foundation-and-work-composition.md).
 
-## Why these stages, and why slices lead
+The hooks are where the value surfaces automatically:
+
+- **`sessionStart`** pulls the latest data (when sync is configured), then injects one merged block: where you left off (last-session recap and current plan), prior findings ranked by relevance to the branch, the active work composition (in-flight plans and open items), and any captured failures awaiting triage.
+- **`postToolUse`** records when you open a prior finding, so the journal can measure whether surfaced findings actually get used.
+- **`postToolUseFailure`** accumulates observable failure facts (tool, error text, exit code) for the session.
+- **`sessionEnd`** seeds a draft finding from the session's checkpoint, fingerprints and de-duplicates the session's failures into work items (PII-scrubbed), then pushes the data (when sync is configured).
+
+Handler order is an explicit list, not a scraped numeric comment, which removes a class of silent ordering collisions.
+
+## The skills
+
+### implementation
+
+Aim, then design, then deliver in validated slices. Delivery leads: build in thin vertical slices, test-first, never accumulating untested code.
 
 craft's contents are chosen by evidence, not taste. The Implementation workflow was validated with a pre-registered behavior-change A/B: does loading it make an agent actually *do* the disciplined things it otherwise would not?
 
 | Behavior | Baseline | With workflow | Result |
 |---|:---:|:---:|---|
 | Deliver in tested slices | 1/9 | **9/9** | validated, decisively |
-| Design with an alternative + trade-off | 0/9 | 3/9 | real but modest |
+| Design with an alternative and trade-off | 0/9 | 3/9 | real but modest |
 | Aim / surface assumptions | 9/9 | 9/9 | no measured separation* |
 
-\* The aim stage showed no separation in a *non-interactive* harness, which cannot exercise interactive intent-clarification. It is kept because it aligns requirements with a human in the loop, the case the A/B could not test, and now carries a researched interactive methodology (the Mom Test + Socratic questioning, converging on Given/When/Then acceptance criteria).
+\* The aim stage showed no separation in a *non-interactive* harness, which cannot exercise interactive intent-clarification. It is kept because it aligns requirements with a human in the loop, the case the A/B could not test. Full method and results: `copilot-tools/experiments/craft-impl-validation/`.
 
-So the workflow leads with delivery-in-slices, keeps design as a gated secondary, and treats aim as a quick frame. Full method and results: `copilot-tools/experiments/craft-impl-validation/` (`verdict.md`, `verdict-t2.md`).
+### decompose
+
+The compose MCP enforces structure (three levels, a valid parent, a valid status). It cannot decide what makes a decomposition good. The decompose skill owns that judgment: pick the right level, create at most five to seven children per pass, go one level deep and let the work reveal the next, keep status and roll-up honest, and triage captured failures instead of letting them pile up. The same discipline applies whether a human prompts the session or a fleet worker pulls the node.
 
 ## Install
 
@@ -35,18 +55,28 @@ copilot plugin marketplace add calebblake_microsoft/craft
 copilot plugin install craft@craft
 ```
 
+Node is required (the MCP servers and hooks run on `node`).
+
+## Data and sync
+
+Craft data lives under `~/.copilot/craft-data` by default, or wherever `$CRAFT_DATA_ROOT` points. Sync is **opt-in and off by default**: nothing turns the data directory into a git repo until you ask. To sync across machines, point it at a private git repo:
+
+```
+setx CRAFT_SYNC_REMOTE "git@github.com:<you>/<your-craft-data>.git"
+```
+
+With a remote configured, `sessionStart` pulls and `sessionEnd` commits and pushes. Append-only JSONL uses git's `merge=union` so concurrent appends from two machines merge without a hand-resolved conflict; a singleton lock serializes git operations on one host, and a failed push leaves a marker that reconciles on the next pull.
+
+Useful environment switches: `CRAFT_SYNC_DISABLE`, `CRAFT_FAILURE_CAPTURE_DISABLE`, `CRAFT_WORKTREE_INJECT_DISABLE`, `CRAFT_DISPATCH_DISABLE` (and per-event `CRAFT_DISPATCH_<EVENT>_DISABLE`).
+
 ## Test
 
 ```powershell
 pwsh tests/Test-Craft.ps1
 ```
 
-Validates the manifests and the skill front-matter.
-
-## Roadmap
-
-v0.1 is deliberately one workflow. Each future workflow must earn its place by the same validation bar before shipping: **Debugging/RCA**, **Refactoring**, **Experiment**, and **Research** workflows, plus a shared **code-review** gate. craft grows only by evidence.
+Runs the node test suite plus manifest and reality-gate checks (the MCP servers are exercised as real stdio processes). The full suite runs in a few seconds and spawns no git.
 
 ## Status
 
-Staging in a personal repo; Microsoft-internal use only, not for public marketplace listings. Built host-agnostic for a clean cut-over to an internal home later.
+Staging in a personal repo; Microsoft-internal use only, not for public marketplace listings. Built host-agnostic for a clean cut-over to an internal home later. The copilot-tools journal and backlog copies keep running until craft is the live install.

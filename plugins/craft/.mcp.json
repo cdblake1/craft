@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "craft-journal": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/journal/server.js"]
+    },
+    "craft-compose": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/compose/server.js"]
+    }
+  }
+}

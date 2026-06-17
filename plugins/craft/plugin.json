@@ -1,12 +1,14 @@
 {
   "name": "craft",
-  "description": "Opinionated engineering-discipline workflows for Copilot CLI. v0.1: the Implementation workflow -- build a non-trivial change with discipline (aim, design, deliver in validated tested slices). Host-agnostic; Microsoft-internal use. See README.md.",
-  "version": "0.1.1",
+  "description": "Opinionated engineering-discipline tooling for Copilot CLI. Two workflow skills (implementation: aim, design, deliver in validated tested slices; decompose: break a goal into the roadmap->plan->item hierarchy), two stdio MCP servers on a shared git-backed storage adapter -- craft-journal (resume continuity + BM25 findings reuse) and craft-compose (roadmap->plan->item work composition with deterministic roll-up) -- and a Node hook dispatcher (resume injector, work-tree injector, draft seeder, findings-consult signal, failure capture). Cross-machine sync at the adapter. Host-agnostic; Microsoft-internal use. See README.md.",
+  "version": "0.3.0",
   "author": {
     "name": "Caleb Blake",
     "email": "calebblake@microsoft.com"
   },
   "repository": "https://github.com/calebblake_microsoft/craft",
   "keywords": ["engineering-discipline", "workflow", "implementation", "tdd"],
-  "skills": "skills/"
+  "skills": "skills/",
+  "mcpServers": ".mcp.json",
+  "hooks": "hooks/hooks.json"
 }
