@@ -8,12 +8,16 @@ craft encodes *how* to do serious engineering work well and gives a session the 
 
 | Component | What it does |
 |---|---|
-| **`implementation` skill** | Build a non-trivial change with discipline: aim, then design, then deliver in validated tested slices. Behavior-validated (see below). |
+| **`research` skill** | Answer a question or uncover a hypothesis space with grounded, triangulated evidence, not a confident guess. The go-to first move for most work. Behavior-validated (see below). |
+| **`experiment` skill** | Validate a hypothesis empirically: pre-register, run a real comparison, decide by the rule. Behavior-validated. |
+| **`implementation` skill** | Build a non-trivial change with discipline: aim, then design, then deliver in validated tested slices. Behavior-validated. |
 | **`decompose` skill** | The judgment layer for the compose MCP: how to break a goal into the roadmap, plan, item hierarchy (leveling, how many per pass, when to stop). |
 | **`craft-journal` MCP** | Resume continuity and findings reuse. Relevance-ranked (BM25) search over prior findings, per-branch plan and step-log, draft seeding. 9 tools. |
 | **`craft-compose` MCP** | Roadmap, plan, item work composition. Create and link nodes, status, deterministic roll-up, the unified tree. Write-time PII guard. 7 tools. |
 | **Node hook dispatcher** | Runs the lifecycle handlers in an explicit, ordered registry across `sessionStart`, `postToolUse`, `postToolUseFailure`, and `sessionEnd`. |
 | **Storage adapter + sync** | One git-backed adapter under both MCPs and every hook; opt-in session-boundary sync across machines. |
+
+The four workflow skills form a pipeline, most agent work starts at the top: **research** (answer the question, surface hypotheses) leads to **experiment** (validate the winners empirically), which leads to **implementation** (build them), with **decompose** structuring the work. Each skill earns its place by a pre-registered behavior-change A/B before it ships; the research and experiment workflows were validated at 9/9 vs 0/9 on their headline behaviors (`copilot-tools/experiments/craft-rx-workflow-validation/`).
 
 ## Architecture
 

@@ -33,6 +33,16 @@ if (Test-Path $decompose) {
   Check ($dtxt -match '(?m)^description:\s*\S') "decompose SKILL.md has description front-matter"
 }
 
+foreach ($wf in 'research', 'experiment') {
+  $p = "$root\plugins\craft\skills\$wf\SKILL.md"
+  Check (Test-Path $p) "$wf SKILL.md exists"
+  if (Test-Path $p) {
+    $t = Get-Content $p -Raw
+    Check ($t -match "(?m)^name:\s*$wf") "$wf SKILL.md has name front-matter"
+    Check ($t -match '(?m)^description:\s*\S') "$wf SKILL.md has description front-matter"
+  }
+}
+
 $hooksJson = "$root\plugins\craft\hooks\hooks.json"
 Check (Test-Path $hooksJson) "hooks.json exists"
 if (Test-Path $hooksJson) {
