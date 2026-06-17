@@ -1,6 +1,6 @@
 # craft
 
-**Opinionated engineering-discipline tooling for GitHub Copilot CLI.** Microsoft-internal.
+**Opinionated engineering-discipline tooling for GitHub Copilot CLI.**
 
 craft encodes *how* to do serious engineering work well and gives a session the substrate to do it: workflow skills that shape behavior, two MCP servers for continuity and work composition, and lifecycle hooks that surface the right context at the right moment. Everything sits on one git-backed data layer that can follow you across machines.
 
@@ -34,6 +34,29 @@ Handler order is an explicit list, not a scraped numeric comment, which removes 
 
 ## The skills
 
+The four skills form a pipeline, **research → experiment → implement**, with **decompose** structuring the work. Most sessions begin at research. Each skill is chosen by evidence: it ships only after a pre-registered behavior-change A/B shows that loading it makes an agent *do* the discipline it otherwise skips.
+
+### research
+
+Answer a question or uncover a hypothesis space with grounded, triangulated evidence, the go-to first move. Validated with a 36-run blinded A/B:
+
+| Behavior | Baseline | With workflow | Result |
+|---|:---:|:---:|---|
+| Grounded (cited + quoted evidence) | 0/9 | **9/9** | validated, decisively |
+| Hypotheses labeled verified-vs-hypothesis | 0/9 | **9/9** | validated, decisively |
+| Triangulated (2+ independent sources) | 0/9 | **9/9** | validated |
+
+### experiment
+
+Validate a hypothesis empirically: pre-register, run a real comparison, decide by the rule. Same A/B:
+
+| Behavior | Baseline | With workflow | Result |
+|---|:---:|:---:|---|
+| Pre-registered before data | 0/9 | **9/9** | validated, decisively |
+| Decide-by-rule (no goalpost moving) | 0/9 | **9/9** | validated, decisively |
+
+\* The honor-the-null stage ships but is not yet behavior-validated (the probe task had a real winner). Full method and results: `copilot-tools/experiments/craft-rx-workflow-validation/`.
+
 ### implementation
 
 Aim, then design, then deliver in validated slices. Delivery leads: build in thin vertical slices, test-first, never accumulating untested code.
@@ -61,6 +84,17 @@ copilot plugin install craft@craft
 
 Node is required (the MCP servers and hooks run on `node`).
 
+Verify it loaded with `/env`, which lists the skills, MCP servers, and hooks the session sees. You should see the four craft skills, the `craft-journal` and `craft-compose` MCP servers, and the craft hooks.
+
+## Using craft
+
+Once installed, craft works with no configuration:
+
+1. **Hooks run automatically.** Resume context, prior findings, the active work tree, and failure capture all happen with no prompting.
+2. **Skills and MCP tools are offered to the agent automatically.** The host pre-loads each skill's name and description, and the agent invokes the matching workflow from how you phrase the work. Say "research the likely causes..." or "experiment whether X is faster..." and the matching skill is picked up. There are no instruction files to edit and nothing to paste.
+
+Note on the built-in commands: Copilot CLI has its own `/research` and `/plan` slash commands. craft's `research` and `implementation` are *skills* (behavioral disciplines the agent loads mid-task), not those commands; they are complementary, and you can use either.
+
 ## Data and sync
 
 Craft data lives under `~/.copilot/craft-data` by default, or wherever `$CRAFT_DATA_ROOT` points. Sync is **opt-in and off by default**: nothing turns the data directory into a git repo until you ask. To sync across machines, point it at a private git repo:
@@ -83,4 +117,4 @@ Runs the node test suite plus manifest and reality-gate checks (the MCP servers 
 
 ## Status
 
-Staging in a personal repo; Microsoft-internal use only, not for public marketplace listings. Built host-agnostic for a clean cut-over to an internal home later. The copilot-tools journal and backlog copies keep running until craft is the live install.
+Staged in a personal repo and not yet listed on a public marketplace. MIT licensed and built host-agnostic, intended to be shared more widely later. The copilot-tools journal and backlog copies keep running until craft is the live install.

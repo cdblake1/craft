@@ -1,6 +1,6 @@
 ---
 name: experiment
-description: 'Validate a hypothesis with empirical evidence instead of asserting an answer: pre-register, run a real comparison, decide by the rule. Use this when the answer is empirical and you do not already have evidence. Use for: which is faster, benchmark this, test the hypothesis, validate empirically, measure X versus Y, prove which is better, run an experiment, A/B this, settle this with data, is X actually faster than Y, compare these approaches.'
+description: 'Validate a hypothesis with empirical evidence instead of asserting an answer: pre-register, run a real comparison, decide by the rule. The step after research surfaces a hypothesis; hand the winner to implementation. Use this when the answer is empirical and you do not already have evidence. Use for: which is faster, benchmark this, test the hypothesis, validate empirically, measure X versus Y, prove which is better, run an experiment, A/B this, settle this with data, is X actually faster than Y, compare these approaches.'
 ---
 
 # Experiment workflow

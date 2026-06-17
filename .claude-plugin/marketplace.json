@@ -5,14 +5,15 @@
     "email": "calebblake@microsoft.com"
   },
   "metadata": {
-    "description": "Marketplace hosting craft. Microsoft-internal use; not for public marketplace listings.",
-    "version": "0.1.1"
+    "description": "Marketplace hosting craft. Staged in a personal repo; not yet listed on a public marketplace.",
+    "version": "0.4.0",
+    "license": "MIT"
   },
   "plugins": [
     {
       "name": "craft",
-      "description": "Opinionated engineering-discipline workflows for Copilot CLI. v0.1 ships the Implementation workflow (aim, design, deliver in validated slices), validated to move agent behavior toward tested incremental delivery.",
-      "version": "0.1.1",
+      "description": "Opinionated engineering-discipline tooling for Copilot CLI. Four workflow skills forming a research -> experiment -> implement pipeline (plus decompose for structuring work), each behavior-validated before shipping; two stdio MCP servers on a shared git-backed storage adapter (craft-journal for resume continuity + BM25 findings reuse, craft-compose for roadmap->plan->item work composition); and a Node hook dispatcher (resume + work-tree injection, failure capture, cross-machine sync). Host-agnostic.",
+      "version": "0.4.0",
       "source": "./plugins/craft"
     }
   ]
