@@ -12,17 +12,17 @@
 //
 // Path resolution:
 //   1. $COPILOT_SESSION_STATE_ROOT env var (used by tests)
-//   2. ~/.copilot/session-state (default)
+//   2. <per-host home>/session-state (~/.claude or ~/.copilot; see lib/host.js)
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+const { hostHome } = require('../../lib/host');
 
 function defaultSessionStateRoot() {
     if (process.env.COPILOT_SESSION_STATE_ROOT) {
         return process.env.COPILOT_SESSION_STATE_ROOT;
     }
-    return path.join(os.homedir(), '.copilot', 'session-state');
+    return path.join(hostHome(), 'session-state');
 }
 
 // workspace.yaml is flat "key: value" (no nesting, no lists). Minimal parser:

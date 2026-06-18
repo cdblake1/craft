@@ -7,7 +7,8 @@
 // Reads the hook payload from stdin, looks up the handlers registered for <event>
 // in the explicit ordered registry, runs each handler's applies()+run() in
 // declared order, merges their additionalContext into one JSON envelope, and
-// writes it to stdout (the Copilot CLI sessionStart/additionalContext contract).
+// writes it to stdout in the active host's envelope shape (see _formatEnvelope:
+// Copilot's { additionalContext } vs Claude Code's { hookSpecificOutput }).
 //
 // Contract:
 //   - Handlers run in registry order. No discovery, no numeric ordering.
@@ -19,15 +20,38 @@
 //     CRAFT_DISPATCH_<EVENT>_DISABLE=1 (one event, upper-cased).
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const registry = require('./registry');
 const { buildContext } = require('./context');
+const { host, hostHome } = require('../lib/host');
+
+// Canonical (lower-camel) event name -> Claude Code's PascalCase hook event name,
+// used only to label the Claude output envelope's hookEventName.
+const CLAUDE_EVENT_NAMES = {
+    sessionStart: 'SessionStart',
+    userPromptSubmit: 'UserPromptSubmit',
+    postToolUse: 'PostToolUse',
+    postToolUseFailure: 'PostToolUseFailure',
+    sessionEnd: 'SessionEnd',
+};
+
+// Wrap merged additionalContext in the envelope the active host expects.
+//   - copilot: { additionalContext }
+//   - claude:  { hookSpecificOutput: { hookEventName, additionalContext } }
+// (Claude only injects additionalContext for SessionStart/UserPromptSubmit; the
+// other events never produce any, so they short-circuit to '' before this runs.)
+function _formatEnvelope(event, additionalContext) {
+    if (host() === 'claude') {
+        const hookEventName = CLAUDE_EVENT_NAMES[event] || event;
+        return JSON.stringify({ hookSpecificOutput: { hookEventName, additionalContext } });
+    }
+    return JSON.stringify({ additionalContext });
+}
 
 function _errorLogPath() {
     const o = String(process.env.CRAFT_DISPATCHER_ERROR_LOG || '').trim();
     if (o) { return o; }
-    return path.join(os.homedir(), '.copilot', 'logs', 'craft-hook-errors.jsonl');
+    return path.join(hostHome(), 'logs', 'craft-hook-errors.jsonl');
 }
 
 function _logErr(event, handlerId, phase, message) {
@@ -53,6 +77,7 @@ function dispatch(event, payload) {
 
     const ctx = buildContext({
         eventType: event,
+        cwd: (payload && payload.cwd) || undefined,
         sessionId: (payload && (payload.session_id || payload.sessionId)) || process.env.COPILOT_SESSION_ID,
     });
 
@@ -77,7 +102,7 @@ function dispatch(event, payload) {
     }
 
     if (chunks.length === 0) { return ''; }
-    return JSON.stringify({ additionalContext: chunks.join('\n\n') });
+    return _formatEnvelope(event, chunks.join('\n\n'));
 }
 
 function _readStdin() {

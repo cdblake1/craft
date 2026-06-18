@@ -14,15 +14,15 @@
 // Root resolution:
 //   1. opts.root (tests pass a temp dir)
 //   2. $CRAFT_DATA_ROOT
-//   3. ~/.copilot/craft-data  (provisional; the unified per-host data repo)
+//   3. <per-host home>/craft-data  (~/.claude or ~/.copilot; see lib/host.js)
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+const { hostHome } = require('./host');
 
 function defaultDataRoot() {
     if (process.env.CRAFT_DATA_ROOT) { return process.env.CRAFT_DATA_ROOT; }
-    return path.join(os.homedir(), '.copilot', 'craft-data');
+    return path.join(hostHome(), 'craft-data');
 }
 
 // Map a logical key ('a/b/c.md') to a native path under the root. Leading

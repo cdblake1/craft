@@ -121,6 +121,11 @@ function runDispatch(event, payload, extraEnv) {
         COPILOT_FINDINGS_CWD: cwdDir,
         COPILOT_SESSION_ID: SESSION_ID,
         COPILOT_SESSION_STATE_ROOT: ssRoot,
+        // Pin the host so the output-envelope shape is deterministic regardless of
+        // which host actually runs this suite (the harness may set CLAUDE_* vars).
+        // Default to copilot's { additionalContext } shape; Claude is asserted
+        // separately below by overriding CRAFT_HOST.
+        CRAFT_HOST: 'copilot',
         // mock git resolution: handlers read these instead of spawning git.
         CRAFT_GIT_BRANCH: BRANCH,
         CRAFT_GIT_REPO: REPO_KEY,
@@ -143,6 +148,17 @@ test('sessionStart dispatch emits a merged additionalContext envelope with the r
     assert.ok(typeof env.additionalContext === 'string', 'output is a JSON additionalContext envelope');
     assert.ok(/Resume context \(journal\)/.test(env.additionalContext), 'resume header present');
     assert.ok(/explicit ordered hook registry/.test(env.additionalContext), 'finding title present');
+});
+
+test('sessionStart dispatch under Claude emits a hookSpecificOutput envelope', () => {
+    const out = runDispatch('sessionStart', { session_id: SESSION_ID },
+        { CRAFT_HOST: 'claude', COPILOT_FINDINGS_MIN_SCORE: '0.01' });
+    const env = JSON.parse(out);
+    assert.ok(env.hookSpecificOutput, 'output is a Claude hookSpecificOutput envelope');
+    assert.strictEqual(env.hookSpecificOutput.hookEventName, 'SessionStart', 'event name is PascalCase');
+    assert.ok(typeof env.hookSpecificOutput.additionalContext === 'string', 'additionalContext present');
+    assert.ok(/Resume context \(journal\)/.test(env.hookSpecificOutput.additionalContext), 'resume header present');
+    assert.strictEqual(env.additionalContext, undefined, 'no top-level Copilot field under Claude');
 });
 
 test('sessionStart dispatch logged an inject row for the session', () => {

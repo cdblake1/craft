@@ -1,36 +1,49 @@
 {
-  "version": 1,
   "hooks": {
-    "sessionStart": [
+    "SessionStart": [
       {
-        "type": "command",
-        "powershell": "node \"${CLAUDE_PLUGIN_ROOT}\\hooks\\dispatch.js\" sessionStart",
-        "bash": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" sessionStart",
-        "timeoutSec": 15
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" sessionStart",
+            "timeout": 15
+          }
+        ]
       }
     ],
-    "postToolUse": [
+    "PostToolUse": [
       {
-        "type": "command",
-        "powershell": "node \"${CLAUDE_PLUGIN_ROOT}\\hooks\\dispatch.js\" postToolUse",
-        "bash": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" postToolUse",
-        "timeoutSec": 3
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" postToolUse",
+            "timeout": 3
+          }
+        ]
       }
     ],
-    "postToolUseFailure": [
+    "PostToolUseFailure": [
       {
-        "type": "command",
-        "powershell": "node \"${CLAUDE_PLUGIN_ROOT}\\hooks\\dispatch.js\" postToolUseFailure",
-        "bash": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" postToolUseFailure",
-        "timeoutSec": 3
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" postToolUseFailure",
+            "timeout": 3
+          }
+        ]
       }
     ],
-    "sessionEnd": [
+    "SessionEnd": [
       {
-        "type": "command",
-        "powershell": "node \"${CLAUDE_PLUGIN_ROOT}\\hooks\\dispatch.js\" sessionEnd",
-        "bash": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" sessionEnd",
-        "timeoutSec": 25
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" sessionEnd",
+            "timeout": 25
+          }
+        ]
       }
     ]
   }
