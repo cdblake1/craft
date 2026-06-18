@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "powershell": "node \"${CLAUDE_PLUGIN_ROOT}\\hooks\\dispatch.js\" sessionStart",
+        "bash": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" sessionStart",
+        "timeoutSec": 15
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "powershell": "node \"${CLAUDE_PLUGIN_ROOT}\\hooks\\dispatch.js\" postToolUse",
+        "bash": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" postToolUse",
+        "timeoutSec": 3
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "powershell": "node \"${CLAUDE_PLUGIN_ROOT}\\hooks\\dispatch.js\" postToolUseFailure",
+        "bash": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" postToolUseFailure",
+        "timeoutSec": 3
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "powershell": "node \"${CLAUDE_PLUGIN_ROOT}\\hooks\\dispatch.js\" sessionEnd",
+        "bash": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" sessionEnd",
+        "timeoutSec": 25
+      }
+    ]
+  }
+}

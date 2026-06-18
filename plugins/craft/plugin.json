@@ -11,5 +11,5 @@
   "keywords": ["engineering-discipline", "workflow", "implementation", "tdd"],
   "skills": "skills/",
   "mcpServers": ".mcp.json",
-  "hooks": "hooks/hooks.json"
+  "hooks": "hooks/hooks.copilot.json"
 }

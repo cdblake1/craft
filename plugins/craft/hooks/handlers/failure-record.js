@@ -10,7 +10,9 @@ const { createFailureCapture } = require('../../mcp-servers/compose/failure');
 const TOOL_NAME_FIELDS = ['tool_name', 'toolName', 'name', 'tool'];
 const ERROR_FIELDS = ['error', 'errorMessage', 'message', 'stderr', 'reason'];
 const EXIT_FIELDS = ['exitCode', 'exit_code', 'code', 'status'];
-const NESTED_FIELDS = ['result', 'toolResult', 'tool_result', 'output', 'detail'];
+// Claude Code's PostToolUseFailure payload carries the result under tool_response
+// / tool_output; Copilot uses result/toolResult/etc. Cover both hosts.
+const NESTED_FIELDS = ['tool_response', 'tool_output', 'result', 'toolResult', 'tool_result', 'output', 'detail'];
 
 function _getField(obj, names) {
     if (!obj || typeof obj !== 'object') { return null; }
