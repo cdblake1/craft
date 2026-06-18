@@ -7,7 +7,7 @@
     "name": "Caleb Blake",
     "email": "calebblake@microsoft.com"
   },
-  "repository": "https://github.com/calebblake_microsoft/craft",
+  "repository": "https://github.com/cdblake1/craft",
   "keywords": ["engineering-discipline", "workflow", "implementation", "tdd"],
   "skills": "../skills/",
   "mcpServers": "../.mcp.json",

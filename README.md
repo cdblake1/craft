@@ -78,7 +78,7 @@ The compose MCP enforces structure (three levels, a valid parent, a valid status
 ## Install
 
 ```
-copilot plugin marketplace add calebblake_microsoft/craft
+copilot plugin marketplace add cdblake1/craft
 copilot plugin install craft@craft
 ```
 
