@@ -34,6 +34,8 @@ Otherwise, before coding, write a short design:
 
 Sketch interfaces; do not paste full schemas. Keep it to the decisions someone would want to ratify before you build.
 
+When the change is non-trivial enough that someone must ratify it before code, write the design as a reviewable spec: follow the [`writing-spec`](../writing-spec/SKILL.md) skill for the section structure (problem, goals/non-goals, proposal, alternatives-with-why, risks, validation, open questions) and run [`writing-documentation`](../writing-documentation/SKILL.md) on the prose before sharing.
+
 ## Stage 3 — Deliver in validated slices (the core)
 
 This is where the discipline pays off. Build in thin vertical slices, each proven before the next begins:
