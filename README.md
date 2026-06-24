@@ -12,12 +12,17 @@ craft encodes *how* to do serious engineering work well and gives a session the 
 | **`experiment` skill** | Validate a hypothesis empirically: pre-register, run a real comparison, decide by the rule. Behavior-validated. |
 | **`implementation` skill** | Build a non-trivial change with discipline: aim, then design, then deliver in validated tested slices. Behavior-validated. |
 | **`decompose` skill** | The judgment layer for the compose MCP: how to break a goal into the roadmap, plan, item hierarchy (leveling, how many per pass, when to stop). |
+| **`clarify-intent` skill** | Socratic interrogation that surfaces the real goal before you commit to a research direction, design, or build. The meta-skill for "am I solving the right problem". |
+| **`writing-documentation` skill** | Long-form technical prose with discipline: pick one doc shape, lead with the verdict, no AI-isms, run the self-review script before publishing. |
+| **Review agents** | Two read-only pre-push code reviewers (`Local Code Review` + `Local Code Review (Consistency)`). Bug-finding and convention-alignment as disjoint, composable passes over the local diff. |
 | **`craft-journal` MCP** | Resume continuity and findings reuse. Relevance-ranked (BM25) search over prior findings, per-branch plan and step-log, draft seeding. 9 tools. |
 | **`craft-compose` MCP** | Roadmap, plan, item work composition. Create and link nodes, status, deterministic roll-up, the unified tree. Write-time PII guard. 7 tools. |
 | **Node hook dispatcher** | Runs the lifecycle handlers in an explicit, ordered registry across `sessionStart`, `postToolUse`, `postToolUseFailure`, and `sessionEnd`. |
 | **Storage adapter + sync** | One git-backed adapter under both MCPs and every hook; opt-in session-boundary sync across machines. |
 
 The four workflow skills form a pipeline, most agent work starts at the top: **research** (answer the question, surface hypotheses) leads to **experiment** (validate the winners empirically), which leads to **implementation** (build them), with **decompose** structuring the work. Each skill earns its place by a pre-registered behavior-change A/B before it ships; the research and experiment workflows were validated at 9/9 vs 0/9 on their headline behaviors (`copilot-tools/experiments/craft-rx-workflow-validation/`).
+
+craft also ships standalone disciplines that compose with the pipeline rather than sitting inside it: the **`clarify-intent`** and **`writing-documentation`** skills, and two read-only **review agents**. See [The review agents](#the-review-agents) below.
 
 ## Architecture
 
@@ -75,6 +80,21 @@ craft's contents are chosen by evidence, not taste. The Implementation workflow 
 
 The compose MCP enforces structure (three levels, a valid parent, a valid status). It cannot decide what makes a decomposition good. The decompose skill owns that judgment: pick the right level, create at most five to seven children per pass, go one level deep and let the work reveal the next, keep status and roll-up honest, and triage captured failures instead of letting them pile up. The same discipline applies whether a human prompts the session or a fleet worker pulls the node.
 
+## The review agents
+
+Two read-only agents review uncommitted or local changes before they hit a pull request, when the cost of a fix is a working-tree edit rather than a force-push and reviewer round-trip. They run on the local diff (working tree, staged, or topic-branch-vs-default) and produce a chat report. Neither edits, commits, pushes, or posts.
+
+They cover **disjoint jobs** and compose: run both for full coverage, or either alone.
+
+| Agent | Job |
+|---|---|
+| **`Local Code Review`** | Find bugs. One pass combining three review lenses (Advocate / Skeptic / Architect), a six-category checklist (design-coherence, api-contract, business-logic, test-fidelity, error-handling, concurrency), and implicit-invariant analysis: enumerate the state / threading / ordering / input invariants the diff assumes, then hypothesize and verify bugs against them. Every finding cites file:line, names a concrete trigger, and is verified by a second read before it ships. |
+| **`Local Code Review (Consistency)`** | Match repo conventions. Reviews the diff against patterns already established in the same repository (sibling files, instruction files whose `applyTo` matches). Derives its rules from the repo at review time; ships no hard-coded checklist. Every finding cites a sibling demonstrating the convention plus a one-line fix. |
+
+The bug-finder's rules forbid convention and style comments, so consistency is a separate agent rather than a section inside it. Both are host-agnostic: they reason about generic repository concepts (source vs test vs config, default branch, instruction files, a build gate that detects the repo's own warnings-as-errors flag) rather than any one toolchain. No model is pinned; both use the host default. See [`plugins/craft/agents/README.md`](plugins/craft/agents/README.md) for the full design.
+
+Invoke by phrasing: "review my changes" / "self-review" / "pre-push review" for the bug-finder, "consistency review" / "convention review" for the Consistency agent.
+
 ## Install
 
 ```
@@ -84,7 +104,7 @@ copilot plugin install craft@craft
 
 Node is required (the MCP servers and hooks run on `node`).
 
-Verify it loaded with `/env`, which lists the skills, MCP servers, and hooks the session sees. You should see the four craft skills, the `craft-journal` and `craft-compose` MCP servers, and the craft hooks.
+Verify it loaded with `/env`, which lists the skills, MCP servers, agents, and hooks the session sees. You should see the six craft skills, the two review agents, the `craft-journal` and `craft-compose` MCP servers, and the craft hooks.
 
 ## Using craft
 
