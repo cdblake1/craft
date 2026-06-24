@@ -12,7 +12,7 @@
   "plugins": [
     {
       "name": "craft",
-      "description": "Opinionated engineering-discipline tooling for Copilot CLI. Four workflow skills forming a research -> experiment -> implement pipeline (plus decompose for structuring work), each behavior-validated before shipping; two stdio MCP servers on a shared git-backed storage adapter (craft-journal for resume continuity + BM25 findings reuse, craft-compose for roadmap->plan->item work composition); and a Node hook dispatcher (resume + work-tree injection, failure capture, cross-machine sync). Host-agnostic.",
+      "description": "Opinionated engineering-discipline tooling for Copilot CLI. Six skills: a research -> experiment -> implement pipeline (plus decompose for structuring work), plus clarify-intent and writing-documentation; two read-only pre-push review agents (bug-finding + repo-convention alignment); two stdio MCP servers on a shared git-backed storage adapter (craft-journal for resume continuity + BM25 findings reuse, craft-compose for roadmap->plan->item work composition); and a Node hook dispatcher (resume + work-tree injection, failure capture, cross-machine sync). Host-agnostic.",
       "version": "0.4.0",
       "source": "./plugins/craft"
     }

@@ -12,10 +12,13 @@ Check ($mk.plugins[0].source -eq './plugins/craft') "marketplace source path cor
 $pj = Get-Content "$root\plugins\craft\plugin.json" -Raw | ConvertFrom-Json
 Check ($pj.name -eq 'craft') "plugin.json name is craft"
 Check ($pj.skills -eq 'skills/') "plugin.json skills path"
+Check ($pj.agents -eq 'agents/') "plugin.json agents path"
 
 $cp = Get-Content "$root\plugins\craft\.claude-plugin\plugin.json" -Raw | ConvertFrom-Json
 Check ($cp.name -eq 'craft') ".claude-plugin/plugin.json name is craft"
-Check ($cp.skills -eq '../skills/') ".claude-plugin/plugin.json skills path"
+# Claude Code auto-discovers skills/agents/mcpServers/hooks from the plugin root,
+# so the Claude manifest intentionally carries no path fields.
+Check ($null -eq $cp.skills -and $null -eq $cp.agents -and $null -eq $cp.hooks) ".claude-plugin/plugin.json omits path fields (Claude auto-discovery)"
 
 $skill = "$root\plugins\craft\skills\implementation\SKILL.md"
 Check (Test-Path $skill) "implementation SKILL.md exists"
@@ -43,20 +46,41 @@ foreach ($wf in 'research', 'experiment') {
   }
 }
 
-$hooksJson = "$root\plugins\craft\hooks\hooks.json"
-Check (Test-Path $hooksJson) "hooks.json exists"
-if (Test-Path $hooksJson) {
-  $hj = Get-Content $hooksJson -Raw | ConvertFrom-Json
-  foreach ($ev in 'sessionStart', 'postToolUse', 'postToolUseFailure', 'sessionEnd') {
-    $cmd = $hj.hooks.$ev[0].powershell
-    Check ($cmd -match "dispatch\.js`"? $ev") "hooks.json wires $ev to the dispatcher"
+foreach ($sk in 'clarify-intent', 'writing-documentation') {
+  $p = "$root\plugins\craft\skills\$sk\SKILL.md"
+  Check (Test-Path $p) "$sk SKILL.md exists"
+  if (Test-Path $p) {
+    $t = Get-Content $p -Raw
+    Check ($t -match "(?m)^name:\s*$sk") "$sk SKILL.md has name front-matter"
+    Check ($t -match '(?m)^description:\s*\S') "$sk SKILL.md has description front-matter"
   }
 }
 
+$agentsDir = "$root\plugins\craft\agents"
+Check (Test-Path $agentsDir) "agents directory exists"
+foreach ($ag in 'Local-Code-Review', 'Local-Code-Review-Consistency') {
+  $ap = "$agentsDir\$ag.agent.md"
+  Check (Test-Path $ap) "$ag.agent.md exists"
+  if (Test-Path $ap) {
+    $at = Get-Content $ap -Raw
+    Check ($at -match '(?m)^name:\s*\S') "$ag.agent.md has name front-matter"
+    Check ($at -match '(?m)^description:\s*\S') "$ag.agent.md has description front-matter"
+  }
+}
+
+$hooksCopilot = "$root\plugins\craft\hooks\hooks.copilot.json"
+Check (Test-Path $hooksCopilot) "hooks.copilot.json exists"
+if (Test-Path $hooksCopilot) {
+  $hj = Get-Content $hooksCopilot -Raw | ConvertFrom-Json
+  foreach ($ev in 'sessionStart', 'postToolUse', 'postToolUseFailure', 'sessionEnd') {
+    $cmd = $hj.hooks.$ev[0].powershell
+    Check ($cmd -match "dispatch\.js`"? $ev") "hooks.copilot.json wires $ev to the dispatcher"
+  }
+}
+Check (Test-Path "$root\plugins\craft\hooks\hooks.json") "hooks.json (Claude format) exists"
+
 Check ($pj.mcpServers -eq '.mcp.json') "plugin.json points at .mcp.json"
-Check ($pj.hooks -eq 'hooks/hooks.json') "plugin.json points at hooks.json"
-Check ($cp.mcpServers -eq '../.mcp.json') ".claude-plugin/plugin.json points at .mcp.json"
-Check ($cp.hooks -eq '../hooks/hooks.json') ".claude-plugin/plugin.json points at hooks.json"
+Check ($pj.hooks -eq 'hooks/hooks.copilot.json') "plugin.json points at hooks.copilot.json"
 
 $mcpJson = "$root\plugins\craft\.mcp.json"
 Check (Test-Path $mcpJson) ".mcp.json exists"
