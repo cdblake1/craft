@@ -67,6 +67,12 @@ The specific file + function + mechanism that produces the reported behavior.
 ## Proposal / Design
 The mental model first, then the change. Lead with the shape; put detail below.
 
+### Diagram
+At least one Mermaid diagram (a fenced `mermaid` code block) of the design: the
+control/decision flow (flowchart), the call path (sequence diagram), or how the
+parts fit (component/architecture). Lead with the diagram, then the prose. Mark
+"N/A" only for a genuinely linear change, with a one-clause reason.
+
 ### API / Interface surface       (when an interface changes)
 Sketch ONLY the types, fields, flags, or endpoints that drive a trade-off.
 Do NOT paste full schemas or proto/SQL definitions; link them. Use RFC 2119
@@ -104,7 +110,7 @@ blocker hiding as a comment.
 Work item, related PRs, prior spec/ADR, external prior art.
 ```
 
-## The 8 reviewability rules
+## The 9 reviewability rules
 
 1. Decision first. TL;DR + Goals + Non-Goals must be readable in under two minutes. If a reviewer must
    read the whole doc to learn what is being decided, it is not ready.
@@ -120,6 +126,10 @@ Work item, related PRs, prior spec/ADR, external prior art.
 8. Length is a quality signal. Target a 20-minute read. AI-bloat (paragraphs restating their heading,
    padding bullets, hedging that makes every sentence true and uninformative) means the author has not
    made the decisions yet, and the spec is not ready.
+9. A non-trivial flow or structure carries a diagram. Include at least one Mermaid diagram (a fenced
+   `mermaid` block) for any non-trivial control flow, call path, or component interaction, so a reviewer
+   grasps the shape from the picture before the prose. N/A only for a genuinely linear change, with a
+   one-clause reason.
 
 ## Before you publish
 
@@ -129,3 +139,4 @@ Work item, related PRs, prior spec/ADR, external prior art.
 4. Run the `writing-documentation` self-review on the file (verdict-first phrasing, no AI-isms, no
    em-dashes, tables for trade-offs). Fix every flag.
 5. The whole spec reads in 20 minutes or it gets split.
+6. The Proposal/Design carries at least one Mermaid diagram in a fenced `mermaid` block (or an N/A reason).
