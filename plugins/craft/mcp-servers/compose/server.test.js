@@ -96,6 +96,22 @@ test('an unknown tool name is an error result', () => {
     assert.ok(/unknown tool name/.test(res.content[0].text));
 });
 
+test('compose_capture honors an explicit status (parked leaf for wave gating)', () => {
+    // Regression: capture previously dropped the status arg and always created
+    // 'open', which broke the app-decompose wave rule (a dependent leaf must be
+    // creatable as 'parked' so the fleet bridge does not dispatch it early). Runs
+    // last with its own roadmap/plan so it perturbs no count-sensitive assertions.
+    const rm = sc('compose_roadmap', { title: 'Status regression' }).id;
+    const pl = sc('compose_plan', { title: 'wave plan', parent_id: rm }).id;
+    const parked = sc('compose_capture', {
+        title: 'wave-2 dependent', plan_id: pl, category: 'feature',
+        next_action: 'do the dependent work', status: 'parked',
+    });
+    assert.strictEqual(parked.status, 'parked', 'explicit status must be honored');
+    const dflt = sc('compose_capture', { title: 'default status', plan_id: pl, category: 'feature' });
+    assert.strictEqual(dflt.status, 'open', 'omitted status still defaults to open');
+});
+
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) { /* best effort */ }
 
 process.stdout.write(`\nTotal: ${passed} passed, ${failed} failed\n`);

@@ -33,7 +33,7 @@ class ComposeError extends Error {
 
 const TOOLS = [
     { name: 'compose_capture', description: 'Append a work item, optionally linked to a plan (plan_id). The leaf of the roadmap->plan->item hierarchy; this is where concrete work and captured failures land. Validates against PII (paths, emails, links) at write time.',
-      inputSchema: { type: 'object', properties: { title: { type: 'string' }, category: { type: 'string' }, severity: { type: 'string' }, plan_id: { type: 'string' }, notes: { type: 'string' }, next_action: { type: 'string' } }, required: ['title'], additionalProperties: false } },
+      inputSchema: { type: 'object', properties: { title: { type: 'string' }, category: { type: 'string' }, severity: { type: 'string' }, plan_id: { type: 'string' }, notes: { type: 'string' }, next_action: { type: 'string' }, status: { type: 'string' } }, required: ['title'], additionalProperties: false } },
     { name: 'compose_plan', description: 'Create a plan node, optionally under a roadmap (parent_id). Plans carry prose plus a rolled-up completion_pct.',
       inputSchema: { type: 'object', properties: { title: { type: 'string' }, parent_id: { type: 'string' }, status: { type: 'string' }, body: { type: 'string' } }, required: ['title'], additionalProperties: false } },
     { name: 'compose_roadmap', description: 'Create a roadmap node (the top level: a narrative outcome). Roadmap health stays narrative, never a computed number.',
@@ -84,6 +84,7 @@ function createServer(compose) {
                 const it = compose.createItem({
                     title: args.title, category: args.category, severity: args.severity,
                     plan_id: args.plan_id, notes: args.notes, next_action: args.next_action,
+                    status: args.status,
                 });
                 return { success: true, id: it.id, type: 'item', status: it.status, category: it.category, plan_id: it.plan_id || null };
             } catch (e) { throw new ComposeError(verb, e.message, []); }
