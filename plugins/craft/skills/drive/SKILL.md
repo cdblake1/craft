@@ -40,11 +40,19 @@ green, check the result back against what the spec and design said:
 A part that passes its own tests but does not match the spec is not done. Coherence is a separate gate
 from green tests.
 
-### 4. Update the roadmap, honestly
+### 4. Update the roadmap, and promote the next wave
 
 Move the part's status and roll up. A roadmap only helps while it matches reality, an "open" part that
 shipped or a "done" part that drifted corrupts every view built on it. If the part revealed real
 sub-work, add it; if it revealed a part that is no longer needed, drop it with a reason.
+
+Then **promote the next wave.** Because the compose model stores no dependency edge and an autonomous
+dispatcher pulls every `open` leaf at once, the build order lives in status (see `app-decompose`'s wave
+rule). When this part shipping unblocks parts that were held `parked`, flip exactly those parts to
+`open` now, with their `next_action` filled in. Promote only the parts whose predecessors have **all**
+shipped; a part promoted early is a part dispatched before its dependency exists. This wave promotion
+is the craft-side substitute for a dependency edge, and it is what lets the same roadmap be driven by
+hand in this session or pulled by a fleet worker, identically.
 
 ## When a slice contradicts the spec
 

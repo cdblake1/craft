@@ -54,7 +54,9 @@ Order the whole roadmap before starting any part.
   behind a go/no-go spike (a technical assumption the spec depends on). A broken assumption must
   surface in part 1, not part 12.
 - **Respect dependencies.** A part that needs another's output comes after it. Make the dependency
-  edges explicit; they are the build order.
+  edges explicit in prose; because the compose model stores no dependency edge, they are encoded at
+  materialization time as status **waves** (Stage 5): a dependent part stays un-`open` until its
+  predecessors ship.
 - **Keep each step shippable.** The sequence should let you stop after any part with a coherent, tested
   increment, never a half-built layer.
 
@@ -69,16 +71,50 @@ Traceability is what keeps the holistic plan honest as it executes.
 - Run a **coverage check**: every spec feature appears in at least one part, every part traces to the
   spec. Record any deliberate deferral as an explicit, reasoned non-goal for this build.
 
-## Stage 5 - Materialize the living roadmap
+## Stage 5 - Materialize the living roadmap as dispatchable compose nodes
 
-Write the roadmap into the living plan so it drives work across sessions, not a throwaway list.
+Write the roadmap into the compose tree so it drives work across sessions and is ready to hand to the
+fleet. The structure is load-bearing: an autonomous worker (and the bridge that feeds it) consumes
+**compose leaf items**, so each part must be a leaf item shaped to be picked up cold.
 
-- Create the roadmap and its parts in the work-composition host (the compose tree, or the host the
-  `living-plan-and-engage` stage selects), with stable ids, dependency links, and status that rolls
-  up.
-- Keep status honest as parts move; a roadmap only helps while it matches reality.
-- Shape each part so it can later be **handed to a worker** (a subagent or a fleet worker): a part is a
-  self-contained, traceable, defined-done unit precisely so the `fleet-ready` stage can dispatch it.
+Map the decomposition onto compose's three levels:
+
+- **Roadmap** (`compose_roadmap`): the whole build. Its body holds the one-paragraph outcome.
+- **Plan** (`compose_plan`, linked to the roadmap): a coherent group of parts (often one per
+  architecture component or one per dependency wave). Put the **shared context in the plan `body`**:
+  the spec excerpt, the architecture boundary, and the features this plan delivers. A dispatcher folds
+  the plan body into every child's prompt, so this is where cross-part context lives once.
+- **Part = item** (`compose_capture`, linked to the plan via `plan_id`): one dispatchable unit. Each
+  item MUST carry:
+  - `next_action` - the **concrete task**, written so a worker with only this item + its plan body
+    can execute it cold. This is the spine of the dispatched prompt; a vague `next_action` is a vague
+    work order. Include the definition of done and the spec feature / UX surface it traces to.
+  - `title` - a concrete, pick-up-cold summary.
+  - `notes` - supporting context not in `next_action` (links to the spec/design section, acceptance).
+  - `severity` - the part's priority (`high` / `medium` / `low` / `info`); a dispatcher maps this to
+    execution value, so riskiest-first parts should outrank polish.
+  - `category` - the kind of work (`feature`, `refactor`, `bug`, ...).
+  - `status` - **`open` exactly when the part is ready to start** (see the wave rule below).
+
+This is the bridge-ready contract: a dispatcher treats a leaf as ready when it is `status: open`, has
+a `plan_id`, and carries a non-empty `next_action`. Every part you intend to be dispatchable must meet
+all three. The `fleet-ready` reference documents the full mapping.
+
+### The wave rule (how a sequenced roadmap survives a dependency-unaware dispatcher)
+
+A dispatcher pulls **every** ready (`open`) leaf, with no view of your dependency edges. So encode the
+build order in **status**, not just in prose:
+
+- A part is `open` **only when its predecessors have shipped**. Until then keep it `parked` (or leave
+  `next_action` empty), so it fails the ready test and is not dispatched early.
+- The parts that are `open` at any moment are one **wave**: mutually independent, safe to run in
+  parallel. The first wave is the riskiest / spike-gated parts.
+- When a wave's parts ship, promote the next wave to `open`. The `drive` stage owns this promotion as
+  it reconciles completed parts; it is the craft-side substitute for a dependency edge the compose
+  model does not store.
+
+- Keep status honest as parts move; a roadmap (and the wave gating) only helps while it matches
+  reality. Roll up the plan after status changes.
 
 ## End state
 
