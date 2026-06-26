@@ -17,7 +17,8 @@ craft encodes *how* to do serious engineering work well and gives a session the 
 | **Review agents** | Two read-only pre-push code reviewers (`Local Code Review` + `Local Code Review (Consistency)`). Bug-finding and convention-alignment as disjoint, composable passes over the local diff. |
 | **`craft-journal` MCP** | Resume continuity and findings reuse. Relevance-ranked (BM25) search over prior findings, per-branch plan and step-log, draft seeding. 9 tools. |
 | **`craft-compose` MCP** | Roadmap, plan, item work composition. Create and link nodes, status, deterministic roll-up, the unified tree. Write-time PII guard. 7 tools. |
-| **Node hook dispatcher** | Runs the lifecycle handlers in an explicit, ordered registry across `sessionStart`, `postToolUse`, `postToolUseFailure`, and `sessionEnd`. |
+| **Node hook dispatcher** | Runs the lifecycle handlers in an explicit, ordered registry across `sessionStart`, `userPromptSubmitted`, `postToolUse`, `postToolUseFailure`, and `sessionEnd`. |
+| **Skill propagation** | Active, not passive: a `sessionStart` catalog injects the skills and the app-scale pipeline every session, and a `userPromptSubmitted` router reads each prompt and names the skill (or the whole chain) to load. So the skills get *used*, not just offered. |
 | **Storage adapter + sync** | One git-backed adapter under both MCPs and every hook; opt-in session-boundary sync across machines. |
 
 The four workflow skills form a pipeline, most agent work starts at the top: **research** (answer the question, surface hypotheses) leads to **experiment** (validate the winners empirically), which leads to **implementation** (build them), with **decompose** structuring the work. Each skill earns its place by a pre-registered behavior-change A/B before it ships; the research and experiment workflows were validated at 9/9 vs 0/9 on their headline behaviors (`copilot-tools/experiments/craft-rx-workflow-validation/`).
@@ -30,7 +31,8 @@ Everything addresses data through a single storage adapter (`lib/storage.js`), b
 
 The hooks are where the value surfaces automatically:
 
-- **`sessionStart`** pulls the latest data (when sync is configured), then injects one merged block: where you left off (last-session recap and current plan), prior findings ranked by relevance to the branch, the active work composition (in-flight plans and open items), and any captured failures awaiting triage.
+- **`sessionStart`** pulls the latest data (when sync is configured), then injects one merged block: where you left off (last-session recap and current plan), prior findings ranked by relevance to the branch, the active work composition (in-flight plans and open items), any captured failures awaiting triage, and an always-on **skill catalog** that names the available skills and the app-scale pipeline (so the skills surface even on a cold repo with no data yet).
+- **`userPromptSubmitted`** reads each prompt and, on a confident intent match, injects a terse directive naming the skill (or the whole `clarify-intent -> research -> product-spec + uiux-design -> app-decompose -> drive` chain) to load. It stays silent on an unmatched prompt, so it steers without adding noise. This is what makes propagation aggressive: skills are routed on every prompt, not just at session start.
 - **`postToolUse`** records when you open a prior finding, so the journal can measure whether surfaced findings actually get used.
 - **`postToolUseFailure`** accumulates observable failure facts (tool, error text, exit code) for the session.
 - **`sessionEnd`** seeds a draft finding from the session's checkpoint, fingerprints and de-duplicates the session's failures into work items (PII-scrubbed), then pushes the data (when sync is configured).
@@ -125,7 +127,7 @@ setx CRAFT_SYNC_REMOTE "git@github.com:<you>/<your-craft-data>.git"
 
 With a remote configured, `sessionStart` pulls and `sessionEnd` commits and pushes. Append-only JSONL uses git's `merge=union` so concurrent appends from two machines merge without a hand-resolved conflict; a singleton lock serializes git operations on one host, and a failed push leaves a marker that reconciles on the next pull.
 
-Useful environment switches: `CRAFT_SYNC_DISABLE`, `CRAFT_FAILURE_CAPTURE_DISABLE`, `CRAFT_WORKTREE_INJECT_DISABLE`, `CRAFT_DISPATCH_DISABLE` (and per-event `CRAFT_DISPATCH_<EVENT>_DISABLE`).
+Useful environment switches: `CRAFT_SYNC_DISABLE`, `CRAFT_FAILURE_CAPTURE_DISABLE`, `CRAFT_WORKTREE_INJECT_DISABLE`, `CRAFT_PROPAGATE_DISABLE` (turns off both the skill catalog and the prompt router; or scope it with `CRAFT_CATALOG_INJECT_DISABLE` / `CRAFT_ROUTER_DISABLE`), `CRAFT_DISPATCH_DISABLE` (and per-event `CRAFT_DISPATCH_<EVENT>_DISABLE`).
 
 ## Test
 

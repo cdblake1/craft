@@ -167,6 +167,35 @@ test('sessionStart dispatch logged an inject row for the session', () => {
     assert.ok(inj.paths.some(p => /findings\/01-dispatch\.md$/.test(p)), 'inject row carries the finding key');
 });
 
+test('sessionStart dispatch always appends the craft skill catalog (propagation)', () => {
+    const out = runDispatch('sessionStart', { session_id: SESSION_ID }, { COPILOT_FINDINGS_MIN_SCORE: '0.01' });
+    const env = JSON.parse(out);
+    assert.ok(/Engineering-discipline skills are available/.test(env.additionalContext), 'catalog header present');
+    assert.ok(/product-spec \+ uiux-design -> app-decompose -> drive/.test(env.additionalContext), 'pipeline named');
+});
+
+test('userPromptSubmitted on an app-scale prompt injects the pipeline directive', () => {
+    const out = runDispatch('userPromptSubmitted', { initial_prompt: 'build a new app for expense tracking' });
+    const env = JSON.parse(out);
+    assert.ok(typeof env.additionalContext === 'string', 'output is an additionalContext envelope');
+    assert.ok(/Run the craft app-PM pipeline/.test(env.additionalContext), 'pipeline directive present');
+    assert.ok(/Scope and design before code/.test(env.additionalContext), 'scope-before-code stated');
+});
+
+test('userPromptSubmitted on an unrelated prompt injects nothing (no noise)', () => {
+    const out = runDispatch('userPromptSubmitted', { initial_prompt: 'what time is it in Tokyo' });
+    assert.strictEqual(out, '', 'no directive for an unmatched prompt');
+});
+
+test('userPromptSubmitted under Claude emits a UserPromptSubmit envelope', () => {
+    const out = runDispatch('userPromptSubmitted', { initial_prompt: 'design the UI and user flows' },
+        { CRAFT_HOST: 'claude' });
+    const env = JSON.parse(out);
+    assert.ok(env.hookSpecificOutput, 'Claude envelope');
+    assert.strictEqual(env.hookSpecificOutput.hookEventName, 'UserPromptSubmit', 'event name is PascalCase');
+    assert.ok(/uiux-design/.test(env.hookSpecificOutput.additionalContext), 'uiux-design routed');
+});
+
 test('postToolUse dispatch on a finding open logs a consult row (no stdout)', () => {
     const out = runDispatch('postToolUse', { toolName: 'view', path: findingAbs });
     assert.strictEqual(out, '', 'postToolUse emits no additionalContext');

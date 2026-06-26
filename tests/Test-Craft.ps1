@@ -72,7 +72,7 @@ $hooksCopilot = "$root\plugins\craft\hooks\hooks.copilot.json"
 Check (Test-Path $hooksCopilot) "hooks.copilot.json exists"
 if (Test-Path $hooksCopilot) {
   $hj = Get-Content $hooksCopilot -Raw | ConvertFrom-Json
-  foreach ($ev in 'sessionStart', 'postToolUse', 'postToolUseFailure', 'sessionEnd') {
+  foreach ($ev in 'sessionStart', 'userPromptSubmitted', 'postToolUse', 'postToolUseFailure', 'sessionEnd') {
     $cmd = $hj.hooks.$ev[0].powershell
     Check ($cmd -match "dispatch\.js`"? $ev") "hooks.copilot.json wires $ev to the dispatcher"
   }

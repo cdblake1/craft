@@ -9,6 +9,14 @@
         "timeoutSec": 15
       }
     ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "powershell": "node \"${CLAUDE_PLUGIN_ROOT}\\hooks\\dispatch.js\" userPromptSubmitted",
+        "bash": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.js\" userPromptSubmitted",
+        "timeoutSec": 5
+      }
+    ],
     "postToolUse": [
       {
         "type": "command",
