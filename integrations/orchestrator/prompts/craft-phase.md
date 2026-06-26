@@ -12,5 +12,10 @@ integration), also exercise it against the real thing and capture the result.
 
 Implement ONLY this phase. The previous phases are already committed in this
 repository; build on them. Before finishing, check the result back against the
-phase's definition of done. Commit your changes with a clear message. Do not push or
-open a pull request; the orchestrator handles that.
+phase's definition of done.
+
+Branch discipline (important): commit your changes directly on the CURRENT branch.
+Do NOT create a new branch, switch branches, push, or open a pull request. The
+orchestrator prepared the branch and handles push and PR; a branch you create
+yourself is invisible to it and your work is lost. Commit on the current branch with a
+clear message and stop.
