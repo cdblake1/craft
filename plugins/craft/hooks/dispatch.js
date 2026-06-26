@@ -29,7 +29,7 @@ const { host, hostHome } = require('../lib/host');
 // used only to label the Claude output envelope's hookEventName.
 const CLAUDE_EVENT_NAMES = {
     sessionStart: 'SessionStart',
-    userPromptSubmit: 'UserPromptSubmit',
+    userPromptSubmitted: 'UserPromptSubmit',
     postToolUse: 'PostToolUse',
     postToolUseFailure: 'PostToolUseFailure',
     sessionEnd: 'SessionEnd',
