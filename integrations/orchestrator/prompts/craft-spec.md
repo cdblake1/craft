@@ -37,5 +37,10 @@ Each phase "prompt" must be a complete, self-contained instruction a separate ag
 can execute without seeing the others: state the files to touch, the behavior to add,
 the slice's definition of done, and that it must be built test-first and keep the
 build and the full test suite green. You may also author a human-readable design doc,
-but the {{planFile}} file is required. Commit your work. Do not push or open a pull
-request; the orchestrator handles that.
+but the {{planFile}} file is required.
+
+Branch discipline (important): commit all of your work directly on the CURRENT branch.
+Do NOT create a new branch, switch branches, push, or open a pull request. The
+orchestrator prepared the branch and handles push and PR; if you create your own
+branch your work will be invisible to it and discarded. Commit your work on the
+current branch and stop.
