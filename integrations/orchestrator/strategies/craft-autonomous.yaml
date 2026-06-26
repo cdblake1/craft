@@ -1,0 +1,48 @@
+name: craft-autonomous
+description: >
+  The craft methodology run as a fully autonomous spec-to-merge loop: a spec agent
+  scopes and decomposes the work the craft way, a spec-review gate blocks a weak plan
+  (and loops a revision), each phase is built as a tested vertical slice, a code-review
+  gate runs craft Local Code Review and blocks an unsafe change (and loops a fix), the
+  planning spec is stripped, and an approved+green feature auto-merges. Uses only the
+  orchestrator's generic mechanisms (designs 0006 + 0007); names no orchestrator
+  internals. Point a target's strategies_dir at this directory and set
+  strategy: craft-autonomous.
+build: spec-first
+
+# The spec/phase build prompts (the craft scope+decompose, then tested slices).
+prompts:
+  spec_prompt_file: ../prompts/craft-autonomous-spec.md
+  phase_prompt_file: ../prompts/craft-phase.md
+
+# Pre-build gate: review the produced plan before any code is written. A confirmed-red
+# denial revises the spec and re-reviews, up to the cap; an exhausted gate dead-letters
+# the item for a human (a weak plan never reaches code).
+spec_gate:
+  type: agent
+  name: spec-review
+  prompt_file: ../prompts/craft-spec-review.md
+  fix_prompt_file: ../prompts/craft-spec-fix.md
+  fix_max_iterations: 2
+
+# Post-build gate: run craft Local Code Review on the built change. A confirmed-red
+# denial drives a fix and re-review, up to the cap; an exhausted gate leaves the item
+# as a draft for a human (never auto-merged). Required, so it gates the verdict.
+checks:
+  - type: agent
+    name: code-review
+    required: true
+    prompt_file: ../prompts/craft-lcr-gate.md
+    fix_prompt_file: ../prompts/craft-lcr-fix.md
+    fix_max_iterations: 2
+
+# The planning spec is a build-time artifact; remove it before the PR to the base
+# branch so it does not ship in the product tree.
+strip_paths:
+  - .craft-spec
+  - orchestrator-plan.json
+
+# Remove the human from the merge only when the code-review gate approved the change
+# (the aggregate verdict is an explicit pass) and verification is green. An exhausted
+# gate yields a non-pass verdict, so it is never auto-merged.
+auto_merge_on_approval: true
