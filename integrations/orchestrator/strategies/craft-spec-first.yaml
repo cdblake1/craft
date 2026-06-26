@@ -1,0 +1,11 @@
+name: craft-spec-first
+description: >
+  Drive the orchestrator's spec-first build with the craft engineering-discipline
+  methodology: a spec agent scopes and decomposes the work the craft way, then each
+  phase is built as a tested vertical slice. Uses the orchestrator's generic
+  prompt-override mechanism (design 0006); names no orchestrator internals. Point a
+  target's strategies_dir at this directory and set strategy: craft-spec-first.
+build: spec-first
+prompts:
+  spec_prompt_file: ../prompts/craft-spec.md
+  phase_prompt_file: ../prompts/craft-phase.md
