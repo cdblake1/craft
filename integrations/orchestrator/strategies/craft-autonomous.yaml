@@ -46,3 +46,12 @@ strip_paths:
 # (the aggregate verdict is an explicit pass) and verification is green. An exhausted
 # gate yields a non-pass verdict, so it is never auto-merged.
 auto_merge_on_approval: true
+
+# Autonomous conflict resolution (design 0008). When an approved feature does not
+# merge cleanly because another item landed first, a supervised agent merges the base
+# in and reconciles the conflicts on the branch; the orchestrator re-verifies green
+# before completing. An unresolvable or build-breaking resolution leaves the PR as a
+# draft for a human. This is what makes higher concurrency hands-off.
+conflict_resolve_file: ../prompts/craft-conflict-resolve.md
+conflict_resolve_max_iterations: 2
+
