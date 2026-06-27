@@ -296,21 +296,52 @@ function createCompose(store) {
         return listPlans().map(p => ({ id: p.id, completion_pct: rollupPlan(p.id) }));
     }
 
+    // Report broken parent links across the tree (D3: a link-integrity check
+    // runs in the rollup path). An item whose plan_id has no plan, or a plan
+    // whose parent_id has no roadmap, is dangling. Reports only -- never
+    // auto-deletes or auto-reparents. Returns [{ id, type, dangling_ref }].
+    function checkLinkIntegrity() {
+        const planIds = new Set(listPlans().map(p => p.id));
+        const roadmapIds = new Set(listRoadmaps().map(r => r.id));
+        const broken = [];
+        for (const it of listItems()) {
+            if (it.plan_id && !planIds.has(it.plan_id)) {
+                broken.push({ id: it.id, type: 'item', dangling_ref: it.plan_id });
+            }
+        }
+        for (const p of listPlans()) {
+            if (p.parent_id && !roadmapIds.has(p.parent_id)) {
+                broken.push({ id: p.id, type: 'plan', dangling_ref: p.parent_id });
+            }
+        }
+        return broken;
+    }
+
     // Assemble the roadmap -> plan -> item tree. Plan completion is computed live
     // so the tree is always current even if a plan's persisted completion_pct is
     // stale. Roadmaps carry child status COUNTS only, never a computed health
     // number (D3: roadmap health stays narrative). With opts.roadmap_id, return
-    // just that subtree; otherwise also surface unparented plans and loose items.
+    // just that subtree; otherwise also surface unparented plans, loose items,
+    // and orphaned items (a plan_id that points at a missing plan -- never
+    // silently dropped).
     function tree(opts) {
         opts = opts || {};
 
+        const plans = listPlans();
+        const planIds = new Set(plans.map(p => p.id));
+
         const itemsByPlan = new Map();
         const looseItems = [];
+        const orphanedItems = [];
         for (const it of listItems()) {
-            if (it.plan_id) {
+            if (it.plan_id && planIds.has(it.plan_id)) {
                 if (!itemsByPlan.has(it.plan_id)) { itemsByPlan.set(it.plan_id, []); }
                 itemsByPlan.get(it.plan_id).push(it);
-            } else { looseItems.push(it); }
+            } else if (it.plan_id) {
+                orphanedItems.push(it);   // plan_id set but the plan is gone -- dangling
+            } else {
+                looseItems.push(it);
+            }
         }
 
         function planNode(p) {
@@ -325,7 +356,7 @@ function createCompose(store) {
 
         const plansByRoadmap = new Map();
         const unparentedPlans = [];
-        for (const p of listPlans()) {
+        for (const p of plans) {
             if (p.parent_id) {
                 if (!plansByRoadmap.has(p.parent_id)) { plansByRoadmap.set(p.parent_id, []); }
                 plansByRoadmap.get(p.parent_id).push(p);
@@ -348,6 +379,8 @@ function createCompose(store) {
         if (!opts.roadmap_id) {
             result.unparentedPlans = unparentedPlans.map(planNode);
             result.looseItems = looseItems.map(i => ({ id: i.id, title: i.title, status: i.status, category: i.category }));
+            // Orphans keep their dangling plan_id so the broken link is visible.
+            result.orphanedItems = orphanedItems.map(i => ({ id: i.id, title: i.title, status: i.status, category: i.category, plan_id: i.plan_id }));
         }
         return result;
     }
@@ -402,7 +435,7 @@ function createCompose(store) {
         createPlan, getPlan, listPlans, updatePlanStatus,
         createRoadmap, getRoadmap, listRoadmaps, updateRoadmapStatus,
         getNode, link,
-        computePlanCompletion, rollupPlan, rollupAll, tree,
+        computePlanCompletion, rollupPlan, rollupAll, checkLinkIntegrity, tree,
         buildWorkTreeInjection,
     };
 }

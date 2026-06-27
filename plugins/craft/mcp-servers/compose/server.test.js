@@ -112,6 +112,20 @@ test('compose_capture honors an explicit status (parked leaf for wave gating)', 
     assert.strictEqual(dflt.status, 'open', 'omitted status still defaults to open');
 });
 
+test('compose_rollup surfaces a link-integrity report for a dangling item link', () => {
+    const fresh = createServer(createCompose(createFileStore({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'craft-compose-srv2-')) })));
+    function scf(name, args) { return fresh.handleRequest({ jsonrpc: '2.0', id: 99, method: 'tools/call', params: { name, arguments: args || {} } }).result.structuredContent; }
+    const p = scf('compose_plan', { title: 'p' });
+    scf('compose_capture', { title: 'ok', plan_id: p.id });
+    const clean = scf('compose_rollup', {});
+    assert.strictEqual(clean.integrity.length, 0, 'no broken links in a valid tree');
+    scf('compose_capture', { title: 'dangling', plan_id: 'GHOSTPLAN0000000000000000' });
+    const report = scf('compose_rollup', {});
+    assert.strictEqual(report.integrity.length, 1, JSON.stringify(report.integrity));
+    assert.strictEqual(report.integrity[0].type, 'item');
+    assert.strictEqual(report.integrity[0].dangling_ref, 'GHOSTPLAN0000000000000000');
+});
+
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) { /* best effort */ }
 
 process.stdout.write(`\nTotal: ${passed} passed, ${failed} failed\n`);

@@ -204,6 +204,39 @@ test('tree surfaces unparented plans and loose items at the top level', () => {
     assert.strictEqual(t.looseItems[0].title, 'loose item');
 });
 
+test('tree surfaces an orphaned item (dangling plan_id) instead of dropping it', () => {
+    const c = fresh();
+    const it = c.createItem({ title: 'orphan', plan_id: 'GHOSTPLAN0000000000000000' });
+    const t = c.tree();
+    assert.strictEqual(t.looseItems.length, 0);          // not loose: it has a plan_id
+    assert.strictEqual(t.orphanedItems.length, 1);       // surfaced, not dropped
+    assert.strictEqual(t.orphanedItems[0].id, it.id);
+    assert.strictEqual(t.orphanedItems[0].plan_id, 'GHOSTPLAN0000000000000000');  // dangling ref kept
+});
+
+test('checkLinkIntegrity reports dangling item and plan links, nothing when valid', () => {
+    const frontmatter = require('./frontmatter');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'craft-compose-'));
+    const store = createFileStore({ root: tmp });
+    const c = createCompose(store);
+    const r = c.createRoadmap({ title: 'r' });
+    const p = c.createPlan({ title: 'p', parent_id: r.id });
+    c.createItem({ title: 'ok', plan_id: p.id });
+    assert.strictEqual(c.checkLinkIntegrity().length, 0);   // all valid
+
+    const orphan = c.createItem({ title: 'dangling item', plan_id: 'GHOSTPLAN0000000000000000' });
+    // Hand-edited rot: a plan doc whose parent_id points at a missing roadmap.
+    const badPlanId = 'BADPLAN00000000000000000A';
+    store.write('compose/plans/' + badPlanId + '.md', frontmatter.stringify(
+        { id: badPlanId, type: 'plan', title: 'bad', parent_id: 'GHOSTROADMAP000000000000A', status: 'open', completion_pct: 0 }, 'body'));
+
+    const broken = c.checkLinkIntegrity();
+    const itemBreak = broken.find(b => b.id === orphan.id);
+    const planBreak = broken.find(b => b.id === badPlanId);
+    assert.ok(itemBreak && itemBreak.type === 'item' && itemBreak.dangling_ref === 'GHOSTPLAN0000000000000000', JSON.stringify(broken));
+    assert.ok(planBreak && planBreak.type === 'plan' && planBreak.dangling_ref === 'GHOSTROADMAP000000000000A', JSON.stringify(broken));
+});
+
 test('tree with a roadmap_id returns just that subtree', () => {
     const c = fresh();
     const r1 = c.createRoadmap({ title: 'r1' });
