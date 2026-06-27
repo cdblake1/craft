@@ -299,10 +299,35 @@ function createCompose(store) {
     // Assemble the roadmap -> plan -> item tree. Plan completion is computed live
     // so the tree is always current even if a plan's persisted completion_pct is
     // stale. Roadmaps carry child status COUNTS only, never a computed health
-    // number (D3: roadmap health stays narrative). With opts.roadmap_id, return
-    // just that subtree; otherwise also surface unparented plans and loose items.
+    // number (D3: roadmap health stays narrative). Each plan node carries its
+    // prose `body`; each item node carries its links (plan_id, roadmap_id) and
+    // prose (severity, notes, next_action) so a consumer can act on a leaf from
+    // the tree alone. With opts.roadmap_id, return just that subtree; otherwise
+    // also surface unparented plans and loose items.
     function tree(opts) {
         opts = opts || {};
+
+        // plan_id -> parent roadmap id, so an item can carry a denormalized
+        // roadmap_id (its plan's parent). A plan with no parent, or an item with
+        // no plan, resolves to null.
+        const planRoadmap = new Map();
+        for (const p of listPlans()) { planRoadmap.set(p.id, p.parent_id || null); }
+
+        // The emitted item shape. Beyond the display basics (title/status/
+        // category) it carries the fields a consumer needs to act on a leaf:
+        // its links (plan_id, roadmap_id) and its prose (notes, next_action,
+        // severity). roadmap_id is the item's plan's parent roadmap, or null.
+        function itemNode(i) {
+            const node = {
+                id: i.id, title: i.title, status: i.status, category: i.category,
+                plan_id: i.plan_id || null,
+                roadmap_id: i.plan_id ? (planRoadmap.get(i.plan_id) || null) : null,
+            };
+            if (i.severity != null) { node.severity = i.severity; }
+            if (i.notes != null) { node.notes = i.notes; }
+            if (i.next_action != null) { node.next_action = i.next_action; }
+            return node;
+        }
 
         const itemsByPlan = new Map();
         const looseItems = [];
@@ -317,9 +342,10 @@ function createCompose(store) {
             const items = itemsByPlan.get(p.id) || [];
             return {
                 id: p.id, type: 'plan', title: p.title, status: p.status,
+                body: p.body || '',
                 completion_pct: computePlanCompletion(p.id),
                 itemStatusCounts: _statusCounts(items),
-                items: items.map(i => ({ id: i.id, title: i.title, status: i.status, category: i.category })),
+                items: items.map(itemNode),
             };
         }
 
@@ -347,7 +373,7 @@ function createCompose(store) {
         const result = { roadmaps: roadmapNodes };
         if (!opts.roadmap_id) {
             result.unparentedPlans = unparentedPlans.map(planNode);
-            result.looseItems = looseItems.map(i => ({ id: i.id, title: i.title, status: i.status, category: i.category }));
+            result.looseItems = looseItems.map(itemNode);
         }
         return result;
     }
