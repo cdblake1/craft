@@ -18,8 +18,10 @@ conflicted file:
 Then make it green and commit:
 
 - Build and run the full test suite; fix any compile or test breakage the merge introduced (a combined
-  signature the callers must match, a field both sides assigned, a renamed symbol). Keep warnings-as-
-  errors clean and do not introduce em dashes in code or user-facing strings.
+  signature the callers must match, a field both sides assigned, a renamed symbol, or a **semantic merge
+  gap with no conflict marker** such as a new interface member that a class added on the other side does
+  not implement, or a new required constructor argument a new caller omits). Keep warnings-as-errors
+  clean and do not introduce em dashes in code or user-facing strings.
 - Stage all resolved files and commit the in-progress merge on the CURRENT branch (`git commit` with no
   conflicts remaining). Do NOT create or switch branches, do NOT push, and do NOT open or complete a
   pull request. The orchestrator verifies the result and completes the merge.

@@ -53,5 +53,5 @@ auto_merge_on_approval: true
 # before completing. An unresolvable or build-breaking resolution leaves the PR as a
 # draft for a human. This is what makes higher concurrency hands-off.
 conflict_resolve_file: ../prompts/craft-conflict-resolve.md
-conflict_resolve_max_iterations: 2
+conflict_resolve_max_iterations: 3
 
