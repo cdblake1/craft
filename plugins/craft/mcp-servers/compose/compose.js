@@ -319,11 +319,31 @@ function createCompose(store) {
     // countable excludes dropped items (abandoned, not pending). Parked items
     // stay in the denominator (deferred work is still incomplete). A plan with
     // no countable items is 0, never NaN.
+    //
+    // _completionOf works from an already-resolved item list so a caller that has
+    // grouped items once (tree, rollupAll, the work-tree injection) does not pay a
+    // fresh full-log read+resolve per plan -- that was an O(plans x items) cost.
+    function _completionOf(items) {
+        const countable = items.filter(i => i.status !== 'dropped');
+        if (countable.length === 0) { return 0; }
+        const shipped = countable.filter(i => i.status === 'shipped').length;
+        return Math.round(100 * shipped / countable.length);
+    }
+
     function computePlanCompletion(planId) {
-        const items = listItems({ plan_id: planId }).filter(i => i.status !== 'dropped');
-        if (items.length === 0) { return 0; }
-        const shipped = items.filter(i => i.status === 'shipped').length;
-        return Math.round(100 * shipped / items.length);
+        return _completionOf(listItems({ plan_id: planId }));
+    }
+
+    // Group every resolved item by plan_id in a single pass, so callers that need
+    // per-plan item lists read and replay the log once instead of once per plan.
+    function _itemsByPlan() {
+        const byPlan = new Map();
+        for (const it of listItems()) {
+            if (!it.plan_id) { continue; }
+            if (!byPlan.has(it.plan_id)) { byPlan.set(it.plan_id, []); }
+            byPlan.get(it.plan_id).push(it);
+        }
+        return byPlan;
     }
 
     function rollupPlan(planId) {
@@ -335,7 +355,44 @@ function createCompose(store) {
     }
 
     function rollupAll() {
-        return listPlans().map(p => ({ id: p.id, completion_pct: rollupPlan(p.id) }));
+        // Read+group items once, then compute every plan's completion from its
+        // group (not a fresh log read per plan), and persist.
+        const byPlan = _itemsByPlan();
+        const rolled = listPlans().map(p => {
+            const pct = _completionOf(byPlan.get(p.id) || []);
+            p.completion_pct = pct;
+            _writeDoc(PLANS_NS, p);
+            return { id: p.id, completion_pct: pct };
+        });
+        // Bound the append-only item log: when its event history has grown well
+        // beyond the resolved item count, collapse it to one line per item.
+        maybeCompactItems();
+        return rolled;
+    }
+
+    // Collapse the append-only items log to one resolved 'create' line per item,
+    // dropping superseded create/update history. The resolved view is unchanged
+    // (a single create replays to the same item), so this is loss-free; it just
+    // bounds replay cost and file growth. Atomic via the adapter's write.
+    function compactItems() {
+        const entries = _readItemEntries();
+        const items = _resolveItems(entries);
+        const lines = items.map((it) => {
+            const e = Object.assign({}, it);
+            e.kind = 'create';   // collapse this item's history to one create
+            return JSON.stringify(e) + '\n';
+        });
+        store.write(ITEMS_KEY, lines.join(''));
+        return { entriesBefore: entries.length, items: items.length };
+    }
+
+    // Compact only when the log has bloated past a small margin over the live
+    // item count, so steady status churn does not rewrite the file every time.
+    function maybeCompactItems() {
+        const entries = _readItemEntries();
+        const items = _resolveItems(entries);
+        if (entries.length > items.length * 2 + 8) { compactItems(); }
+        return false;
     }
 
     // Report broken parent links across the tree (D3: a link-integrity check
@@ -367,9 +424,19 @@ function createCompose(store) {
     // prose (severity, notes, next_action) so a consumer can act on a leaf from
     // the tree alone. With opts.roadmap_id, return just that subtree; otherwise
     // also surface unparented plans, loose items, and orphaned items (a plan_id
-    // that points at a missing plan -- never silently dropped).
+    // that points at a missing plan -- never silently dropped). With opts.status
+    // (a status or array), the emitted item lists are narrowed to those statuses
+    // while completion and the status counts still reflect every item.
     function tree(opts) {
         opts = opts || {};
+
+        // Optional status filter: narrows the items EMITTED in the output (and
+        // the loose/orphaned buckets) without changing completion or the status
+        // COUNTS, which stay computed from every item so the view never lies
+        // about how much work exists. Accepts a status string or an array.
+        const statusFilter = (opts.status == null || opts.status === '')
+            ? null : new Set([].concat(opts.status).map(String));
+        const passes = (i) => !statusFilter || statusFilter.has(i.status);
 
         const plans = listPlans();
         const planIds = new Set(plans.map(p => p.id));
@@ -415,9 +482,9 @@ function createCompose(store) {
             return {
                 id: p.id, type: 'plan', title: p.title, status: p.status,
                 body: p.body || '',
-                completion_pct: computePlanCompletion(p.id),
-                itemStatusCounts: _statusCounts(items),
-                items: items.map(itemNode),
+                completion_pct: _completionOf(items),   // from the grouped list; no per-plan re-read
+                itemStatusCounts: _statusCounts(items), // counts reflect ALL items, not the filtered view
+                items: items.filter(passes).map(itemNode),
             };
         }
 
@@ -445,10 +512,10 @@ function createCompose(store) {
         const result = { roadmaps: roadmapNodes };
         if (!opts.roadmap_id) {
             result.unparentedPlans = unparentedPlans.map(planNode);
-            result.looseItems = looseItems.map(itemNode);
+            result.looseItems = looseItems.filter(passes).map(itemNode);
             // Orphans keep their dangling plan_id (itemNode emits it) so the
             // broken link stays visible; roadmap_id resolves to null.
-            result.orphanedItems = orphanedItems.map(itemNode);
+            result.orphanedItems = orphanedItems.filter(passes).map(itemNode);
         }
         return result;
     }
@@ -469,16 +536,21 @@ function createCompose(store) {
         // in-flight before merely-open, so the active work leads.
         plans.sort((a, b) => (a.status === 'in-flight' ? 0 : 1) - (b.status === 'in-flight' ? 0 : 1));
 
+        // Read+group the item log once for every plan's completion + open count.
+        const byPlan = _itemsByPlan();
+        const allItems = listItems();
+
         const planLines = [];
         for (const p of plans.slice(0, maxPlans)) {
-            const pct = computePlanCompletion(p.id);
-            const openItems = listItems({ plan_id: p.id }).filter(i => active.indexOf(i.status) !== -1).length;
+            const planItems = byPlan.get(p.id) || [];
+            const pct = _completionOf(planItems);
+            const openItems = planItems.filter(i => active.indexOf(i.status) !== -1).length;
             const rm = p.parent_id ? getRoadmap(p.parent_id) : null;
             planLines.push(`- [${String(pct).padStart(3)}%] ${p.title}` +
                 (rm ? ` (roadmap: ${rm.title})` : '') + ` -- ${openItems} open item(s) [${p.id}]`);
         }
 
-        const failures = listItems({ status: 'open' }).filter(i => i.category === 'failure');
+        const failures = allItems.filter(i => i.status === 'open' && i.category === 'failure');
 
         if (planLines.length === 0 && failures.length === 0) { return null; }
 
@@ -503,7 +575,7 @@ function createCompose(store) {
         createPlan, getPlan, listPlans, updatePlanStatus, updatePlanFields,
         createRoadmap, getRoadmap, listRoadmaps, updateRoadmapStatus, updateRoadmapFields,
         getNode, link,
-        computePlanCompletion, rollupPlan, rollupAll, checkLinkIntegrity, tree,
+        computePlanCompletion, rollupPlan, rollupAll, compactItems, checkLinkIntegrity, tree,
         buildWorkTreeInjection,
     };
 }
