@@ -138,6 +138,26 @@ function createCompose(store) {
         return _appendItemUpdate(id, patch);
     }
 
+    // Edit an item's content fields in place (id and links preserved). Status is
+    // NOT changed here -- that stays updateItemStatus. Implemented as a replayed
+    // 'update' entry, the same append-and-overlay model as a status change. Only
+    // the fields present in `fields` are touched.
+    function updateItem(id, fields) {
+        fields = fields || {};
+        const patch = {};
+        if (fields.title != null) { patch.title = _requireTitle(fields.title); }
+        if (fields.severity != null) { patch.severity = _checkEnum(fields.severity, ITEM_SEVERITIES, 'severity'); }
+        if (fields.category != null) { patch.category = _checkEnum(fields.category, ITEM_CATEGORIES, 'category'); }
+        if (fields.notes != null) { patch.notes = String(fields.notes); }
+        if (fields.next_action != null) {
+            const na = String(fields.next_action);
+            if (na.length > NEXT_ACTION_MAX) { throw new Error(`next_action exceeds ${NEXT_ACTION_MAX} chars`); }
+            patch.next_action = na;
+        }
+        if (Object.keys(patch).length === 0) { throw new Error('no editable item fields supplied'); }
+        return _appendItemUpdate(id, patch);
+    }
+
     // === plans / roadmaps (markdown + frontmatter) =========================
 
     function _docKey(ns, id) { return ns + '/' + id + '.md'; }
@@ -206,6 +226,17 @@ function createCompose(store) {
         return _writeDoc(PLANS_NS, p);
     }
 
+    // Edit a plan's content fields (title, body) in place; id, parent_id,
+    // status, and completion_pct are preserved. Status is NOT changed here.
+    function updatePlanFields(id, fields) {
+        fields = fields || {};
+        const p = getPlan(id);
+        if (!p) { throw new Error(`no such plan: ${id}`); }
+        if (fields.title != null) { p.title = _requireTitle(fields.title); }
+        if (fields.body != null) { p.body = String(fields.body); }
+        return _writeDoc(PLANS_NS, p);
+    }
+
     function createRoadmap(opts) {
         opts = opts || {};
         const node = {
@@ -236,6 +267,17 @@ function createCompose(store) {
         const r = getRoadmap(id);
         if (!r) { throw new Error(`no such roadmap: ${id}`); }
         r.status = _checkEnum(status, NODE_STATUSES, 'status');
+        return _writeDoc(ROADMAPS_NS, r);
+    }
+
+    // Edit a roadmap's content fields (title, body) in place; id and status are
+    // preserved. Status is NOT changed here.
+    function updateRoadmapFields(id, fields) {
+        fields = fields || {};
+        const r = getRoadmap(id);
+        if (!r) { throw new Error(`no such roadmap: ${id}`); }
+        if (fields.title != null) { r.title = _requireTitle(fields.title); }
+        if (fields.body != null) { r.body = String(fields.body); }
         return _writeDoc(ROADMAPS_NS, r);
     }
 
@@ -320,15 +362,39 @@ function createCompose(store) {
     // Assemble the roadmap -> plan -> item tree. Plan completion is computed live
     // so the tree is always current even if a plan's persisted completion_pct is
     // stale. Roadmaps carry child status COUNTS only, never a computed health
-    // number (D3: roadmap health stays narrative). With opts.roadmap_id, return
-    // just that subtree; otherwise also surface unparented plans, loose items,
-    // and orphaned items (a plan_id that points at a missing plan -- never
-    // silently dropped).
+    // number (D3: roadmap health stays narrative). Each plan node carries its
+    // prose `body`; each item node carries its links (plan_id, roadmap_id) and
+    // prose (severity, notes, next_action) so a consumer can act on a leaf from
+    // the tree alone. With opts.roadmap_id, return just that subtree; otherwise
+    // also surface unparented plans, loose items, and orphaned items (a plan_id
+    // that points at a missing plan -- never silently dropped).
     function tree(opts) {
         opts = opts || {};
 
         const plans = listPlans();
         const planIds = new Set(plans.map(p => p.id));
+
+        // plan_id -> parent roadmap id, so an item can carry a denormalized
+        // roadmap_id (its plan's parent). A plan with no parent, or an item with
+        // no plan, resolves to null.
+        const planRoadmap = new Map();
+        for (const p of plans) { planRoadmap.set(p.id, p.parent_id || null); }
+
+        // The emitted item shape. Beyond the display basics (title/status/
+        // category) it carries the fields a consumer needs to act on a leaf:
+        // its links (plan_id, roadmap_id) and its prose (notes, next_action,
+        // severity). roadmap_id is the item's plan's parent roadmap, or null.
+        function itemNode(i) {
+            const node = {
+                id: i.id, title: i.title, status: i.status, category: i.category,
+                plan_id: i.plan_id || null,
+                roadmap_id: i.plan_id ? (planRoadmap.get(i.plan_id) || null) : null,
+            };
+            if (i.severity != null) { node.severity = i.severity; }
+            if (i.notes != null) { node.notes = i.notes; }
+            if (i.next_action != null) { node.next_action = i.next_action; }
+            return node;
+        }
 
         const itemsByPlan = new Map();
         const looseItems = [];
@@ -348,9 +414,10 @@ function createCompose(store) {
             const items = itemsByPlan.get(p.id) || [];
             return {
                 id: p.id, type: 'plan', title: p.title, status: p.status,
+                body: p.body || '',
                 completion_pct: computePlanCompletion(p.id),
                 itemStatusCounts: _statusCounts(items),
-                items: items.map(i => ({ id: i.id, title: i.title, status: i.status, category: i.category })),
+                items: items.map(itemNode),
             };
         }
 
@@ -378,9 +445,10 @@ function createCompose(store) {
         const result = { roadmaps: roadmapNodes };
         if (!opts.roadmap_id) {
             result.unparentedPlans = unparentedPlans.map(planNode);
-            result.looseItems = looseItems.map(i => ({ id: i.id, title: i.title, status: i.status, category: i.category }));
-            // Orphans keep their dangling plan_id so the broken link is visible.
-            result.orphanedItems = orphanedItems.map(i => ({ id: i.id, title: i.title, status: i.status, category: i.category, plan_id: i.plan_id }));
+            result.looseItems = looseItems.map(itemNode);
+            // Orphans keep their dangling plan_id (itemNode emits it) so the
+            // broken link stays visible; roadmap_id resolves to null.
+            result.orphanedItems = orphanedItems.map(itemNode);
         }
         return result;
     }
@@ -431,9 +499,9 @@ function createCompose(store) {
 
     return {
         ITEM_STATUSES, NODE_STATUSES, ITEM_CATEGORIES, ITEM_SEVERITIES,
-        createItem, listItems, getItem, updateItemStatus,
-        createPlan, getPlan, listPlans, updatePlanStatus,
-        createRoadmap, getRoadmap, listRoadmaps, updateRoadmapStatus,
+        createItem, listItems, getItem, updateItemStatus, updateItem,
+        createPlan, getPlan, listPlans, updatePlanStatus, updatePlanFields,
+        createRoadmap, getRoadmap, listRoadmaps, updateRoadmapStatus, updateRoadmapFields,
         getNode, link,
         computePlanCompletion, rollupPlan, rollupAll, checkLinkIntegrity, tree,
         buildWorkTreeInjection,

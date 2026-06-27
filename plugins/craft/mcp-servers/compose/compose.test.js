@@ -60,6 +60,39 @@ test('updateItemStatus rejects an unknown status and an unknown id', () => {
     assert.throws(() => c.updateItemStatus('NOPE', 'shipped'), /no such item/);
 });
 
+test('updateItem edits content fields in place, preserving status and links', () => {
+    const c = fresh();
+    const p = c.createPlan({ title: 'plan' });
+    const it = c.createItem({ title: 'orig', plan_id: p.id, severity: 'low', category: 'idea' });
+    c.updateItemStatus(it.id, 'in-flight');
+    c.updateItem(it.id, { title: 'edited', severity: 'high', category: 'bug', next_action: 'go' });
+    const got = c.getItem(it.id);
+    assert.strictEqual(got.title, 'edited');
+    assert.strictEqual(got.severity, 'high');
+    assert.strictEqual(got.category, 'bug');
+    assert.strictEqual(got.next_action, 'go');
+    assert.strictEqual(got.status, 'in-flight');   // status untouched
+    assert.strictEqual(got.plan_id, p.id);          // link untouched
+    assert.throws(() => c.updateItem(it.id, { severity: 'nope' }), /invalid severity/);
+    assert.throws(() => c.updateItem(it.id, {}), /no editable item fields/);
+});
+
+test('updatePlanFields and updateRoadmapFields edit title/body in place', () => {
+    const c = fresh();
+    const r = c.createRoadmap({ title: 'road', body: 'old health' });
+    const p = c.createPlan({ title: 'plan', parent_id: r.id, body: 'old body' });
+    c.updatePlanFields(p.id, { title: 'plan v2', body: 'new body' });
+    c.updateRoadmapFields(r.id, { body: 'new health' });
+    const gp = c.getPlan(p.id);
+    assert.strictEqual(gp.title, 'plan v2');
+    assert.strictEqual(gp.body.trim(), 'new body');
+    assert.strictEqual(gp.parent_id, r.id);          // link untouched
+    assert.strictEqual(gp.completion_pct, 0);         // preserved
+    assert.strictEqual(c.getRoadmap(r.id).body.trim(), 'new health');
+    assert.strictEqual(c.getRoadmap(r.id).title, 'road');   // untouched field stays
+    assert.throws(() => c.updatePlanFields('NOPE', { title: 'x' }), /no such plan/);
+});
+
 test('listItems filters by status and by plan_id', () => {
     const c = fresh();
     const p = c.createPlan({ title: 'A plan' });
@@ -235,6 +268,39 @@ test('checkLinkIntegrity reports dangling item and plan links, nothing when vali
     const planBreak = broken.find(b => b.id === badPlanId);
     assert.ok(itemBreak && itemBreak.type === 'item' && itemBreak.dangling_ref === 'GHOSTPLAN0000000000000000', JSON.stringify(broken));
     assert.ok(planBreak && planBreak.type === 'plan' && planBreak.dangling_ref === 'GHOSTROADMAP000000000000A', JSON.stringify(broken));
+});
+
+test('tree items carry links + prose (plan_id, roadmap_id, severity, notes, next_action) and plans carry body', () => {
+    const c = fresh();
+    const r = c.createRoadmap({ title: 'road' });
+    const p = c.createPlan({ title: 'plan', parent_id: r.id, body: 'shared context for children' });
+    c.createItem({
+        title: 'leaf', plan_id: p.id, category: 'feature', severity: 'high',
+        notes: 'supporting context', next_action: 'do the concrete thing',
+    });
+    const pn = c.tree().roadmaps[0].plans[0];
+    assert.strictEqual(pn.body.trim(), 'shared context for children');   // plan prose emitted
+    const it = pn.items[0];
+    assert.strictEqual(it.plan_id, p.id);
+    assert.strictEqual(it.roadmap_id, r.id);                       // denormalized from the plan's parent
+    assert.strictEqual(it.severity, 'high');
+    assert.strictEqual(it.notes, 'supporting context');
+    assert.strictEqual(it.next_action, 'do the concrete thing');
+    assert.strictEqual(it.category, 'feature');
+});
+
+test('tree resolves roadmap_id to null for a loose item and an item under an unparented plan', () => {
+    const c = fresh();
+    const orphanPlan = c.createPlan({ title: 'no roadmap' });      // parent_id null
+    c.createItem({ title: 'under orphan plan', plan_id: orphanPlan.id, next_action: 'x' });
+    c.createItem({ title: 'truly loose' });                        // no plan_id
+    const t = c.tree();
+    const underOrphan = t.unparentedPlans[0].items[0];
+    assert.strictEqual(underOrphan.plan_id, orphanPlan.id);
+    assert.strictEqual(underOrphan.roadmap_id, null);              // plan has no roadmap
+    const loose = t.looseItems[0];
+    assert.strictEqual(loose.plan_id, null);
+    assert.strictEqual(loose.roadmap_id, null);
 });
 
 test('tree with a roadmap_id returns just that subtree', () => {
