@@ -170,8 +170,9 @@ test('sessionStart dispatch logged an inject row for the session', () => {
 test('sessionStart dispatch always appends the craft skill catalog (propagation)', () => {
     const out = runDispatch('sessionStart', { session_id: SESSION_ID }, { COPILOT_FINDINGS_MIN_SCORE: '0.01' });
     const env = JSON.parse(out);
-    assert.ok(/Engineering-discipline skills are available/.test(env.additionalContext), 'catalog header present');
+    assert.ok(/Engineering- and product-discipline skills are available/.test(env.additionalContext), 'catalog header present');
     assert.ok(/product-spec \+ uiux-design -> app-decompose -> drive/.test(env.additionalContext), 'pipeline named');
+    assert.ok(/product-discovery ->/.test(env.additionalContext) && /-> product-quality -> .*release-readiness/.test(env.additionalContext), 'PM bookends named');
 });
 
 test('userPromptSubmitted on an app-scale prompt injects the pipeline directive', () => {

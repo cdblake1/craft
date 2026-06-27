@@ -73,6 +73,21 @@ test('research phrasing routes to research', () => {
     assert.ok(ids.includes('research'), 'research matched');
 });
 
+test('discovery phrasing routes to product-discovery', () => {
+    const ids = matchPrompt('is this worth building, and who is this for').map(m => m.id);
+    assert.ok(ids.includes('product-discovery'), 'product-discovery matched');
+});
+
+test('quality phrasing routes to product-quality', () => {
+    const ids = matchPrompt('is the product good, and what should we fix next').map(m => m.id);
+    assert.ok(ids.includes('product-quality'), 'product-quality matched');
+});
+
+test('release phrasing routes to release-readiness', () => {
+    const ids = matchPrompt('is it ready to ship, run the launch checklist').map(m => m.id);
+    assert.ok(ids.includes('release-readiness'), 'release-readiness matched');
+});
+
 test('matching is case-insensitive', () => {
     const ids = matchPrompt('RESEARCH THE OPTIONS AND TRADE-OFFS').map(m => m.id);
     assert.ok(ids.includes('research'), 'research matched upper-case');
