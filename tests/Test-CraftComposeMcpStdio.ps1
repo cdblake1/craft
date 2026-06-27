@@ -6,7 +6,7 @@
     Unit tests exercise handleRequest in-memory. This drives `node server.js` as a
     spawned process with newline-delimited JSON-RPC on stdin (against a temp
     CRAFT_DATA_ROOT) and asserts the roadmap->plan->item hierarchy round-trips
-    through the storage adapter: initialize + tools/list (7) + a create chain +
+    through the storage adapter: initialize + tools/list (8) + a create chain +
     a tree read.
 #>
 [CmdletBinding()]
@@ -49,7 +49,7 @@ try {
     foreach ($l in ($reqs | & node $server 2>$null)) { if ($l.Trim()) { $o = $l | ConvertFrom-Json; $byId[[int]$o.id] = $o } }
 
     Check ($byId[1].result.serverInfo.name -eq 'craft-compose') "initialize returns craft-compose"
-    Check ($byId[2].result.tools.Count -eq 7) "tools/list returns 7 tools"
+    Check ($byId[2].result.tools.Count -eq 8) "tools/list returns 8 tools"
     $tree = $byId[3].result.structuredContent
     Check ($tree.roadmaps.Count -eq 1) "tree has the roadmap"
     Check ($tree.roadmaps[0].plans[0].id -eq $planId) "tree threads roadmap->plan"
