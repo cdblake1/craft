@@ -10,7 +10,7 @@ The gate oracle is `plugins/craft/mcp-servers/compose/capability.test.js` (runs 
 
 | Invariant | Oracle | Result |
 |---|---|---|
-| D4: small described tool surface | `tools/list` == documented 8-tool set, each described + object schema | **PASS** |
+| D4: small described tool surface | `tools/list` == documented 9-tool set, each described + object schema | **PASS** |
 | D3-a: three levels, enforced parents | item-to-roadmap and plan-to-plan links rejected | **PASS** |
 | D3-b: deterministic roll-up | shipped/(non-dropped), persisted, repeatable | **PASS** |
 | D3-c: narrative roadmap health | roadmap node carries no computed `completion_pct` | **PASS** |

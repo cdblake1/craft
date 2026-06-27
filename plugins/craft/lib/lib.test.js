@@ -72,6 +72,35 @@ test('write is atomic (no leftover temp files)', () => {
     assert.deepStrictEqual(leftovers, []);
 });
 
+// === withLock (advisory doc lock) ===========================================
+
+test('withLock runs fn and returns its value, then releases the lock', () => {
+    const got = store.withLock('t-basic', () => 42);
+    assert.strictEqual(got, 42);
+    assert.ok(!store.exists('.locks/t-basic'), 'lock released after fn returns');
+});
+
+test('withLock releases the lock even when fn throws', () => {
+    assert.throws(() => store.withLock('t-throw', () => { throw new Error('boom'); }), /boom/);
+    assert.ok(!store.exists('.locks/t-throw'), 'lock released after fn throws');
+});
+
+test('withLock is re-entrant within the same process (no self-deadlock)', () => {
+    const got = store.withLock('t-reentrant', () => store.withLock('t-reentrant', () => 'inner'));
+    assert.strictEqual(got, 'inner');
+    assert.ok(!store.exists('.locks/t-reentrant'), 'lock released after nested return');
+});
+
+test('withLock steals a stale lock whose recorded PID is dead', () => {
+    // Simulate an abandoned lock: a lock dir with a PID that cannot be alive.
+    const deadPid = 2147483646; // implausible PID; process.kill(pid,0) -> ESRCH
+    store.write('.locks/t-stale/pid', String(deadPid));
+    assert.ok(store.exists('.locks/t-stale'), 'precondition: stale lock present');
+    const got = store.withLock('t-stale', () => 'acquired');
+    assert.strictEqual(got, 'acquired', 'stole the stale lock and ran fn');
+    assert.ok(!store.exists('.locks/t-stale'), 'released after run');
+});
+
 // === findings store (the consumer) over the adapter =========================
 
 const BRANCH = 'journals/repo/dev/test/A';

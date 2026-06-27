@@ -45,7 +45,9 @@ const TOOLS = [
       inputSchema: { type: 'object', properties: { title: { type: 'string' }, status: { type: 'string' }, body: { type: 'string' } }, required: ['title'], additionalProperties: false } },
     { name: 'compose_link', description: 'Link a child to its parent by id: an item to a plan, or a plan to a roadmap. Enforces the level rules.',
       inputSchema: { type: 'object', properties: { child_id: { type: 'string' }, parent_id: { type: 'string' } }, required: ['child_id', 'parent_id'], additionalProperties: false } },
-    { name: 'compose_status', description: 'Append a status change to any node (item, plan, or roadmap). Item statuses: open, evaluated, in-flight, shipped, dropped, parked. Plan/roadmap: same minus evaluated.',
+    { name: 'compose_unlink', description: 'Detach a node from its parent (the inverse of compose_link): an item becomes loose (no plan), a plan becomes unparented (no roadmap). For correcting a mis-capture. A roadmap is a root and has no parent to unlink.',
+      inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false } },
+    { name: 'compose_status', description: 'Append a status change to any node (item, plan, or roadmap). Item statuses: open (captured, not triaged), evaluated (triaged/assessed but not yet started), in-flight (being worked), shipped (done), dropped (abandoned, excluded from roll-up), parked (deferred, still counts as incomplete). Plan/roadmap use the same set minus the triage-only evaluated.',
       inputSchema: { type: 'object', properties: { id: { type: 'string' }, status: { type: 'string' }, notes: { type: 'string' }, next_action: { type: 'string' } }, required: ['id', 'status'], additionalProperties: false } },
     { name: 'compose_update', description: 'Edit an existing node\'s content fields in place (id, links, and status preserved). Item: title, severity, category, notes, next_action. Plan/roadmap: title, body. Status is changed via compose_status, not here. Validates against PII at write time.',
       inputSchema: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, severity: { type: 'string' }, category: { type: 'string' }, notes: { type: 'string' }, next_action: { type: 'string' } }, required: ['id'], additionalProperties: false } },
@@ -122,6 +124,16 @@ function createServer(compose) {
                 compose.link(args.child_id, args.parent_id);
                 const child = compose.getNode(args.child_id);
                 return { success: true, child_id: args.child_id, parent_id: args.parent_id, child_type: child.type };
+            } catch (e) { throw new ComposeError(verb, e.message, []); }
+        },
+        compose_unlink(args) {
+            const verb = 'unlink node';
+            _reqStr(args, 'id', verb);
+            const node = compose.getNode(args.id);
+            if (!node) { throw new ComposeError(verb, `no such node: ${args.id}`, [['field', 'id']]); }
+            try {
+                compose.unlink(args.id);
+                return { success: true, id: args.id, type: node.type };
             } catch (e) { throw new ComposeError(verb, e.message, []); }
         },
         compose_status(args) {
