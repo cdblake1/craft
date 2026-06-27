@@ -33,11 +33,11 @@ test('initialize identifies the compose server', () => {
     assert.strictEqual(r.result.serverInfo.name, 'craft-compose');
 });
 
-test('tools/list returns the 7 compose tools', () => {
+test('tools/list returns the 8 compose tools', () => {
     const r = server.handleRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
-    assert.strictEqual(r.result.tools.length, 7);
+    assert.strictEqual(r.result.tools.length, 8);
     const names = r.result.tools.map(t => t.name);
-    for (const n of ['compose_capture', 'compose_plan', 'compose_roadmap', 'compose_link', 'compose_status', 'compose_tree', 'compose_rollup']) {
+    for (const n of ['compose_capture', 'compose_plan', 'compose_roadmap', 'compose_link', 'compose_status', 'compose_update', 'compose_tree', 'compose_rollup']) {
         assert.ok(names.includes(n), `missing ${n}`);
     }
 });
@@ -76,6 +76,38 @@ test('compose_tree renders the roadmap with its plan and item', () => {
     assert.strictEqual(t.roadmaps[0].plans[0].id, planId);
     assert.strictEqual(t.roadmaps[0].plans[0].completion_pct, 100);
     assert.strictEqual(t.roadmaps[0].plans[0].items[0].id, itemId);
+});
+
+test('compose_update edits an item and a plan; id + links survive (verified via tree)', () => {
+    sc('compose_update', { id: planId, title: 'Ship compose v2' });
+    sc('compose_update', { id: itemId, title: 'node model v2', category: 'refactor' });
+    const t = sc('compose_tree', {});
+    const pn = t.roadmaps[0].plans[0];
+    assert.strictEqual(pn.id, planId);
+    assert.strictEqual(pn.title, 'Ship compose v2');
+    const it = pn.items[0];
+    assert.strictEqual(it.id, itemId);              // id preserved
+    assert.strictEqual(it.title, 'node model v2');
+    assert.strictEqual(it.category, 'refactor');
+});
+
+test('compose_update rejects a type-mismatched field (body on an item)', () => {
+    const res = call('compose_update', { id: itemId, body: 'items have no body' });
+    assert.ok(res.isError, 'expected a type-mismatch error');
+    assert.ok(/does not apply to a item/.test(res.content[0].text), res.content[0].text);
+});
+
+test('compose_update rejects a type-mismatched field (severity on a plan)', () => {
+    const res = call('compose_update', { id: planId, severity: 'high' });
+    assert.ok(res.isError);
+    assert.ok(/does not apply to a plan/.test(res.content[0].text), res.content[0].text);
+});
+
+test('compose_update rejects PII in an updated field and an unknown id', () => {
+    const pii = call('compose_update', { id: itemId, notes: 'see C:/Users/bob/secret' });
+    assert.ok(pii.isError && /possible PII/.test(pii.content[0].text), pii.content[0].text);
+    const nope = call('compose_update', { id: 'NOSUCHID', title: 'x' });
+    assert.ok(nope.isError && /no such node/.test(nope.content[0].text), nope.content[0].text);
 });
 
 test('compose_capture rejects PII in the title (write-time guard)', () => {

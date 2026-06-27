@@ -42,6 +42,8 @@ const TOOLS = [
       inputSchema: { type: 'object', properties: { child_id: { type: 'string' }, parent_id: { type: 'string' } }, required: ['child_id', 'parent_id'], additionalProperties: false } },
     { name: 'compose_status', description: 'Append a status change to any node (item, plan, or roadmap). Item statuses: open, evaluated, in-flight, shipped, dropped, parked. Plan/roadmap: same minus evaluated.',
       inputSchema: { type: 'object', properties: { id: { type: 'string' }, status: { type: 'string' }, notes: { type: 'string' }, next_action: { type: 'string' } }, required: ['id', 'status'], additionalProperties: false } },
+    { name: 'compose_update', description: 'Edit an existing node\'s content fields in place (id, links, and status preserved). Item: title, severity, category, notes, next_action. Plan/roadmap: title, body. Status is changed via compose_status, not here. Validates against PII at write time.',
+      inputSchema: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, severity: { type: 'string' }, category: { type: 'string' }, notes: { type: 'string' }, next_action: { type: 'string' } }, required: ['id'], additionalProperties: false } },
     { name: 'compose_tree', description: 'Render the roadmap->plan->item tree (the unified view). With roadmap_id, return just that subtree; otherwise also surface unparented plans and loose items. Plan completion is computed live.',
       inputSchema: { type: 'object', properties: { roadmap_id: { type: 'string' } }, additionalProperties: false } },
     { name: 'compose_rollup', description: 'Recompute plan completion_pct from child item states and persist it. With plan_id, roll up one plan; otherwise roll up all plans. Deterministic count-based (shipped / non-dropped).',
@@ -129,6 +131,31 @@ function createServer(compose) {
                 else if (node.type === 'plan') { compose.updatePlanStatus(args.id, args.status); }
                 else { compose.updateRoadmapStatus(args.id, args.status); }
                 return { success: true, id: args.id, type: node.type, status: args.status };
+            } catch (e) { throw new ComposeError(verb, e.message, []); }
+        },
+        compose_update(args) {
+            const verb = 'update node';
+            _reqStr(args, 'id', verb);
+            _piiGuard(verb, { title: args.title || '', body: args.body || '', notes: args.notes || '', next_action: args.next_action || '' });
+            const node = compose.getNode(args.id);
+            if (!node) { throw new ComposeError(verb, `no such node: ${args.id}`, [['field', 'id']]); }
+            // Reject fields that do not apply to the target node type, so a
+            // mistyped edit fails loudly rather than silently dropping a field.
+            const itemOnly = ['severity', 'category', 'next_action'];
+            const docOnly = ['body'];
+            const reject = node.type === 'item' ? docOnly : itemOnly;
+            for (const f of reject) {
+                if (args[f] != null) { throw new ComposeError(verb, `field "${f}" does not apply to a ${node.type}`, [['field', f]]); }
+            }
+            try {
+                if (node.type === 'item') {
+                    compose.updateItem(args.id, { title: args.title, severity: args.severity, category: args.category, notes: args.notes, next_action: args.next_action });
+                } else if (node.type === 'plan') {
+                    compose.updatePlanFields(args.id, { title: args.title, body: args.body });
+                } else {
+                    compose.updateRoadmapFields(args.id, { title: args.title, body: args.body });
+                }
+                return { success: true, id: args.id, type: node.type };
             } catch (e) { throw new ComposeError(verb, e.message, []); }
         },
         compose_tree(args) {

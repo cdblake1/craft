@@ -138,6 +138,26 @@ function createCompose(store) {
         return _appendItemUpdate(id, patch);
     }
 
+    // Edit an item's content fields in place (id and links preserved). Status is
+    // NOT changed here -- that stays updateItemStatus. Implemented as a replayed
+    // 'update' entry, the same append-and-overlay model as a status change. Only
+    // the fields present in `fields` are touched.
+    function updateItem(id, fields) {
+        fields = fields || {};
+        const patch = {};
+        if (fields.title != null) { patch.title = _requireTitle(fields.title); }
+        if (fields.severity != null) { patch.severity = _checkEnum(fields.severity, ITEM_SEVERITIES, 'severity'); }
+        if (fields.category != null) { patch.category = _checkEnum(fields.category, ITEM_CATEGORIES, 'category'); }
+        if (fields.notes != null) { patch.notes = String(fields.notes); }
+        if (fields.next_action != null) {
+            const na = String(fields.next_action);
+            if (na.length > NEXT_ACTION_MAX) { throw new Error(`next_action exceeds ${NEXT_ACTION_MAX} chars`); }
+            patch.next_action = na;
+        }
+        if (Object.keys(patch).length === 0) { throw new Error('no editable item fields supplied'); }
+        return _appendItemUpdate(id, patch);
+    }
+
     // === plans / roadmaps (markdown + frontmatter) =========================
 
     function _docKey(ns, id) { return ns + '/' + id + '.md'; }
@@ -206,6 +226,17 @@ function createCompose(store) {
         return _writeDoc(PLANS_NS, p);
     }
 
+    // Edit a plan's content fields (title, body) in place; id, parent_id,
+    // status, and completion_pct are preserved. Status is NOT changed here.
+    function updatePlanFields(id, fields) {
+        fields = fields || {};
+        const p = getPlan(id);
+        if (!p) { throw new Error(`no such plan: ${id}`); }
+        if (fields.title != null) { p.title = _requireTitle(fields.title); }
+        if (fields.body != null) { p.body = String(fields.body); }
+        return _writeDoc(PLANS_NS, p);
+    }
+
     function createRoadmap(opts) {
         opts = opts || {};
         const node = {
@@ -236,6 +267,17 @@ function createCompose(store) {
         const r = getRoadmap(id);
         if (!r) { throw new Error(`no such roadmap: ${id}`); }
         r.status = _checkEnum(status, NODE_STATUSES, 'status');
+        return _writeDoc(ROADMAPS_NS, r);
+    }
+
+    // Edit a roadmap's content fields (title, body) in place; id and status are
+    // preserved. Status is NOT changed here.
+    function updateRoadmapFields(id, fields) {
+        fields = fields || {};
+        const r = getRoadmap(id);
+        if (!r) { throw new Error(`no such roadmap: ${id}`); }
+        if (fields.title != null) { r.title = _requireTitle(fields.title); }
+        if (fields.body != null) { r.body = String(fields.body); }
         return _writeDoc(ROADMAPS_NS, r);
     }
 
@@ -424,9 +466,9 @@ function createCompose(store) {
 
     return {
         ITEM_STATUSES, NODE_STATUSES, ITEM_CATEGORIES, ITEM_SEVERITIES,
-        createItem, listItems, getItem, updateItemStatus,
-        createPlan, getPlan, listPlans, updatePlanStatus,
-        createRoadmap, getRoadmap, listRoadmaps, updateRoadmapStatus,
+        createItem, listItems, getItem, updateItemStatus, updateItem,
+        createPlan, getPlan, listPlans, updatePlanStatus, updatePlanFields,
+        createRoadmap, getRoadmap, listRoadmaps, updateRoadmapStatus, updateRoadmapFields,
         getNode, link,
         computePlanCompletion, rollupPlan, rollupAll, tree,
         buildWorkTreeInjection,

@@ -60,6 +60,39 @@ test('updateItemStatus rejects an unknown status and an unknown id', () => {
     assert.throws(() => c.updateItemStatus('NOPE', 'shipped'), /no such item/);
 });
 
+test('updateItem edits content fields in place, preserving status and links', () => {
+    const c = fresh();
+    const p = c.createPlan({ title: 'plan' });
+    const it = c.createItem({ title: 'orig', plan_id: p.id, severity: 'low', category: 'idea' });
+    c.updateItemStatus(it.id, 'in-flight');
+    c.updateItem(it.id, { title: 'edited', severity: 'high', category: 'bug', next_action: 'go' });
+    const got = c.getItem(it.id);
+    assert.strictEqual(got.title, 'edited');
+    assert.strictEqual(got.severity, 'high');
+    assert.strictEqual(got.category, 'bug');
+    assert.strictEqual(got.next_action, 'go');
+    assert.strictEqual(got.status, 'in-flight');   // status untouched
+    assert.strictEqual(got.plan_id, p.id);          // link untouched
+    assert.throws(() => c.updateItem(it.id, { severity: 'nope' }), /invalid severity/);
+    assert.throws(() => c.updateItem(it.id, {}), /no editable item fields/);
+});
+
+test('updatePlanFields and updateRoadmapFields edit title/body in place', () => {
+    const c = fresh();
+    const r = c.createRoadmap({ title: 'road', body: 'old health' });
+    const p = c.createPlan({ title: 'plan', parent_id: r.id, body: 'old body' });
+    c.updatePlanFields(p.id, { title: 'plan v2', body: 'new body' });
+    c.updateRoadmapFields(r.id, { body: 'new health' });
+    const gp = c.getPlan(p.id);
+    assert.strictEqual(gp.title, 'plan v2');
+    assert.strictEqual(gp.body.trim(), 'new body');
+    assert.strictEqual(gp.parent_id, r.id);          // link untouched
+    assert.strictEqual(gp.completion_pct, 0);         // preserved
+    assert.strictEqual(c.getRoadmap(r.id).body.trim(), 'new health');
+    assert.strictEqual(c.getRoadmap(r.id).title, 'road');   // untouched field stays
+    assert.throws(() => c.updatePlanFields('NOPE', { title: 'x' }), /no such plan/);
+});
+
 test('listItems filters by status and by plan_id', () => {
     const c = fresh();
     const p = c.createPlan({ title: 'A plan' });
