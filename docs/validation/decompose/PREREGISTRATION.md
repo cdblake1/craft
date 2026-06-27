@@ -7,7 +7,7 @@ validation plan the capability owed (it previously had only function-level unit 
 
 ## What is under test
 
-- **The artifact:** `plugins/craft/mcp-servers/compose/` (the compose MCP: 8 tools, the node model,
+- **The artifact:** `plugins/craft/mcp-servers/compose/` (the compose MCP: 9 tools, the node model,
   failure capture, the work-tree injection) and the `decompose` / `app-decompose` skills that drive it.
 - **The reference bar:** design `0001-foundation-and-work-composition.md`, decisions D3, D4, D6, D7 and
   the cross-cutting concerns. These are the contract the capability claims to uphold.
@@ -20,7 +20,7 @@ through the real MCP dispatch and the real model and asserts one invariant per d
 
 | # | Invariant (from design 0001) | Oracle |
 |---|---|---|
-| D4 | A small, fixed, **described** tool surface (no dead-tool sprawl) | `tools/list` is exactly the documented 8-tool set, each with a description and an object input schema |
+| D4 | A small, fixed, **described** tool surface (no dead-tool sprawl) | `tools/list` is exactly the documented 9-tool set, each with a description and an object input schema |
 | D3-a | Three levels with **enforced** parents | an item cannot link to a roadmap; a plan cannot link to a plan |
 | D3-b | **Deterministic** count-based roll-up | shipped / (non-dropped), persisted, repeatable (same input gives the same number) |
 | D3-c | Roadmap health stays **narrative** | a roadmap node never carries a computed `completion_pct` |

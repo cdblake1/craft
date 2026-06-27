@@ -33,11 +33,11 @@ test('initialize identifies the compose server', () => {
     assert.strictEqual(r.result.serverInfo.name, 'craft-compose');
 });
 
-test('tools/list returns the 8 compose tools', () => {
+test('tools/list returns the 9 compose tools', () => {
     const r = server.handleRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
-    assert.strictEqual(r.result.tools.length, 8);
+    assert.strictEqual(r.result.tools.length, 9);
     const names = r.result.tools.map(t => t.name);
-    for (const n of ['compose_capture', 'compose_plan', 'compose_roadmap', 'compose_link', 'compose_status', 'compose_update', 'compose_tree', 'compose_rollup']) {
+    for (const n of ['compose_capture', 'compose_plan', 'compose_roadmap', 'compose_link', 'compose_unlink', 'compose_status', 'compose_update', 'compose_tree', 'compose_rollup']) {
         assert.ok(names.includes(n), `missing ${n}`);
     }
 });
@@ -178,6 +178,25 @@ test('compose_tree status filter and the oversized-text size guard', () => {
     const res = scf('compose_tree', {}).result;
     assert.ok(/text summarized; full tree in structuredContent/.test(res.content[0].text), res.content[0].text.slice(0, 120));
     assert.ok(res.structuredContent.unparentedPlans[0].items.length >= 400, 'structuredContent keeps the full tree');
+});
+
+test('compose_unlink detaches an item (loose) and a plan (unparented); roadmap rejected', () => {
+    const fresh = createServer(createCompose(createFileStore({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'craft-compose-srv4-')) })));
+    function scf(name, args) { return fresh.handleRequest({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name, arguments: args || {} } }); }
+    const rid = scf('compose_roadmap', { title: 'r' }).result.structuredContent.id;
+    const pid = scf('compose_plan', { title: 'p', parent_id: rid }).result.structuredContent.id;
+    const iid = scf('compose_capture', { title: 'i', plan_id: pid }).result.structuredContent.id;
+
+    assert.ok(scf('compose_unlink', { id: iid }).result.structuredContent.success);
+    assert.ok(scf('compose_tree', {}).result.structuredContent.looseItems.some(x => x.id === iid), 'item now loose');
+
+    assert.ok(scf('compose_unlink', { id: pid }).result.structuredContent.success);
+    assert.ok(scf('compose_tree', {}).result.structuredContent.unparentedPlans.some(x => x.id === pid), 'plan now unparented');
+
+    const rmRes = scf('compose_unlink', { id: rid }).result;
+    assert.ok(rmRes.isError && /roadmap is a root/.test(rmRes.content[0].text), rmRes.content[0].text);
+    const noRes = scf('compose_unlink', { id: 'NOSUCHID' }).result;
+    assert.ok(noRes.isError && /no such node/.test(noRes.content[0].text), noRes.content[0].text);
 });
 
 

@@ -26,6 +26,17 @@ const ROADMAPS_NS = 'compose/roadmaps';
 // Items keep the backlog's status + category vocabulary (they ARE the backlog),
 // extended with a 'failure' category for the failure-capture path (D6). Plans
 // and roadmaps use a smaller lifecycle (no triage-only 'evaluated').
+//
+// Item status lifecycle (the full vocabulary, so 'evaluated' is a documented
+// triage state, not mystery surface):
+//   open       captured, not yet triaged
+//   evaluated  triaged/assessed but not yet started -- the triage-only state
+//              (this is the one plans/roadmaps don't have); use it to mark an
+//              item you have looked at and kept but are not acting on yet
+//   in-flight  actively being worked
+//   shipped    done (the numerator of roll-up)
+//   dropped    abandoned -- excluded from roll-up entirely (not the denominator)
+//   parked     deferred -- still counts as incomplete (stays in the denominator)
 const ITEM_STATUSES = ['open', 'evaluated', 'in-flight', 'shipped', 'dropped', 'parked'];
 const NODE_STATUSES = ['open', 'in-flight', 'shipped', 'dropped', 'parked'];
 const ITEM_CATEGORIES = ['cost', 'perf', 'hook-gap', 'skill-gap', 'bug', 'feature', 'refactor', 'idea', 'recipe', 'failure'];
@@ -220,21 +231,25 @@ function createCompose(store) {
     }
 
     function updatePlanStatus(id, status) {
-        const p = getPlan(id);
-        if (!p) { throw new Error(`no such plan: ${id}`); }
-        p.status = _checkEnum(status, NODE_STATUSES, 'status');
-        return _writeDoc(PLANS_NS, p);
+        return store.withLock('compose-docs', () => {
+            const p = getPlan(id);
+            if (!p) { throw new Error(`no such plan: ${id}`); }
+            p.status = _checkEnum(status, NODE_STATUSES, 'status');
+            return _writeDoc(PLANS_NS, p);
+        });
     }
 
     // Edit a plan's content fields (title, body) in place; id, parent_id,
     // status, and completion_pct are preserved. Status is NOT changed here.
     function updatePlanFields(id, fields) {
         fields = fields || {};
-        const p = getPlan(id);
-        if (!p) { throw new Error(`no such plan: ${id}`); }
-        if (fields.title != null) { p.title = _requireTitle(fields.title); }
-        if (fields.body != null) { p.body = String(fields.body); }
-        return _writeDoc(PLANS_NS, p);
+        return store.withLock('compose-docs', () => {
+            const p = getPlan(id);
+            if (!p) { throw new Error(`no such plan: ${id}`); }
+            if (fields.title != null) { p.title = _requireTitle(fields.title); }
+            if (fields.body != null) { p.body = String(fields.body); }
+            return _writeDoc(PLANS_NS, p);
+        });
     }
 
     function createRoadmap(opts) {
@@ -264,21 +279,25 @@ function createCompose(store) {
     }
 
     function updateRoadmapStatus(id, status) {
-        const r = getRoadmap(id);
-        if (!r) { throw new Error(`no such roadmap: ${id}`); }
-        r.status = _checkEnum(status, NODE_STATUSES, 'status');
-        return _writeDoc(ROADMAPS_NS, r);
+        return store.withLock('compose-docs', () => {
+            const r = getRoadmap(id);
+            if (!r) { throw new Error(`no such roadmap: ${id}`); }
+            r.status = _checkEnum(status, NODE_STATUSES, 'status');
+            return _writeDoc(ROADMAPS_NS, r);
+        });
     }
 
     // Edit a roadmap's content fields (title, body) in place; id and status are
     // preserved. Status is NOT changed here.
     function updateRoadmapFields(id, fields) {
         fields = fields || {};
-        const r = getRoadmap(id);
-        if (!r) { throw new Error(`no such roadmap: ${id}`); }
-        if (fields.title != null) { r.title = _requireTitle(fields.title); }
-        if (fields.body != null) { r.body = String(fields.body); }
-        return _writeDoc(ROADMAPS_NS, r);
+        return store.withLock('compose-docs', () => {
+            const r = getRoadmap(id);
+            if (!r) { throw new Error(`no such roadmap: ${id}`); }
+            if (fields.title != null) { r.title = _requireTitle(fields.title); }
+            if (fields.body != null) { r.body = String(fields.body); }
+            return _writeDoc(ROADMAPS_NS, r);
+        });
     }
 
     // === generic node access + linking =====================================
@@ -301,10 +320,35 @@ function createCompose(store) {
         }
         if (child.type === 'plan') {
             if (parent.type !== 'roadmap') { throw new Error('a plan can only link to a roadmap'); }
-            child.parent_id = String(parentId);
-            return _writeDoc(PLANS_NS, child);
+            return store.withLock('compose-docs', () => {
+                child.parent_id = String(parentId);
+                return _writeDoc(PLANS_NS, child);
+            });
         }
         throw new Error('a roadmap has no parent to link to');
+    }
+
+    // Detach a node from its parent: an item becomes loose (no plan), a plan
+    // becomes unparented (no roadmap). The inverse of link, for correcting a
+    // mis-capture. A roadmap is a root and has no parent to clear.
+    //
+    // An item's plan_id is cleared with an '' update entry: the resolver overlays
+    // '' (it skips only null/undefined), and '' is falsy everywhere the code tests
+    // plan_id, so the item reads as loose. (A null update would be skipped by the
+    // resolver and leave the old link in place, so '' is the correct clear value.)
+    function unlink(childId) {
+        const child = getNode(childId);
+        if (!child) { throw new Error(`no such node: ${childId}`); }
+        if (child.type === 'item') {
+            return _appendItemUpdate(childId, { plan_id: '' });
+        }
+        if (child.type === 'plan') {
+            return store.withLock('compose-docs', () => {
+                child.parent_id = null;
+                return _writeDoc(PLANS_NS, child);
+            });
+        }
+        throw new Error('a roadmap is a root; it has no parent to unlink');
     }
 
     // === tree assembly + deterministic roll-up =============================
@@ -347,27 +391,31 @@ function createCompose(store) {
     }
 
     function rollupPlan(planId) {
-        const p = getPlan(planId);
-        if (!p) { throw new Error(`no such plan: ${planId}`); }
-        p.completion_pct = computePlanCompletion(planId);
-        _writeDoc(PLANS_NS, p);
-        return p.completion_pct;
+        return store.withLock('compose-docs', () => {
+            const p = getPlan(planId);
+            if (!p) { throw new Error(`no such plan: ${planId}`); }
+            p.completion_pct = computePlanCompletion(planId);
+            _writeDoc(PLANS_NS, p);
+            return p.completion_pct;
+        });
     }
 
     function rollupAll() {
-        // Read+group items once, then compute every plan's completion from its
-        // group (not a fresh log read per plan), and persist.
-        const byPlan = _itemsByPlan();
-        const rolled = listPlans().map(p => {
-            const pct = _completionOf(byPlan.get(p.id) || []);
-            p.completion_pct = pct;
-            _writeDoc(PLANS_NS, p);
-            return { id: p.id, completion_pct: pct };
+        return store.withLock('compose-docs', () => {
+            // Read+group items once, then compute every plan's completion from its
+            // group (not a fresh log read per plan), and persist.
+            const byPlan = _itemsByPlan();
+            const rolled = listPlans().map(p => {
+                const pct = _completionOf(byPlan.get(p.id) || []);
+                p.completion_pct = pct;
+                _writeDoc(PLANS_NS, p);
+                return { id: p.id, completion_pct: pct };
+            });
+            // Bound the append-only item log: when its event history has grown well
+            // beyond the resolved item count, collapse it to one line per item.
+            maybeCompactItems();
+            return rolled;
         });
-        // Bound the append-only item log: when its event history has grown well
-        // beyond the resolved item count, collapse it to one line per item.
-        maybeCompactItems();
-        return rolled;
     }
 
     // Collapse the append-only items log to one resolved 'create' line per item,
@@ -574,7 +622,7 @@ function createCompose(store) {
         createItem, listItems, getItem, updateItemStatus, updateItem,
         createPlan, getPlan, listPlans, updatePlanStatus, updatePlanFields,
         createRoadmap, getRoadmap, listRoadmaps, updateRoadmapStatus, updateRoadmapFields,
-        getNode, link,
+        getNode, link, unlink,
         computePlanCompletion, rollupPlan, rollupAll, compactItems, checkLinkIntegrity, tree,
         buildWorkTreeInjection,
     };

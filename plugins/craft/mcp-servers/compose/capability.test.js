@@ -68,7 +68,7 @@ test('D4: the tool surface is exactly the documented set, each described', () =>
     const e = env();
     const r = e.server.handleRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
     const names = r.result.tools.map(t => t.name).sort();
-    const expected = ['compose_capture', 'compose_link', 'compose_plan', 'compose_rollup', 'compose_roadmap', 'compose_status', 'compose_tree', 'compose_update'].sort();
+    const expected = ['compose_capture', 'compose_link', 'compose_unlink', 'compose_plan', 'compose_rollup', 'compose_roadmap', 'compose_status', 'compose_tree', 'compose_update'].sort();
     assert.deepStrictEqual(names, expected, 'tool surface drifted from the documented set');
     for (const t of r.result.tools) {
         assert.ok(typeof t.description === 'string' && t.description.length > 0, `${t.name} has a description`);

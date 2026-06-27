@@ -168,6 +168,27 @@ test('link enforces item->plan and plan->roadmap, rejecting bad levels', () => {
     assert.throws(() => c.link(p.id, p.id), /plan can only link to a roadmap/);
 });
 
+test('unlink detaches an item to loose and a plan to unparented; roadmap rejected', () => {
+    const c = fresh();
+    const r = c.createRoadmap({ title: 'r' });
+    const p = c.createPlan({ title: 'p', parent_id: r.id });
+    const it = c.createItem({ title: 'i', plan_id: p.id });
+
+    c.unlink(it.id);
+    assert.ok(!c.getItem(it.id).plan_id, 'item plan_id cleared (loose)');
+    assert.strictEqual(c.listItems({ plan_id: null }).length, 1, 'item now counts as loose');
+    const t1 = c.tree();
+    assert.ok(t1.looseItems.some(x => x.id === it.id), 'unlinked item appears in looseItems');
+
+    c.unlink(p.id);
+    assert.strictEqual(c.getPlan(p.id).parent_id, null, 'plan parent_id cleared (unparented)');
+    const t2 = c.tree();
+    assert.ok(t2.unparentedPlans.some(x => x.id === p.id), 'unlinked plan appears in unparentedPlans');
+
+    assert.throws(() => c.unlink(r.id), /roadmap is a root/);
+    assert.throws(() => c.unlink('NOSUCH'), /no such node/);
+});
+
 test('getNode resolves any node type by id', () => {
     const c = fresh();
     const r = c.createRoadmap({ title: 'r' });
