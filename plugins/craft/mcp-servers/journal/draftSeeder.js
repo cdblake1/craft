@@ -8,7 +8,7 @@
 // hash of the overview against existing findings + drafts, and the hash is in the
 // filename so distinct overviews that slug to the same name cannot overwrite each
 // other. Draft writes go through the adapter; the recap is read from the host
-// session-state via sessionState (design 0001 D5/W1).
+// session-state via sessionState (design decision D5/W1).
 
 const crypto = require('crypto');
 

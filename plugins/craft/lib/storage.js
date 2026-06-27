@@ -6,7 +6,7 @@
 // and every hook: callers address data by a logical, '/'-separated key and
 // never touch the filesystem directly. This file is the git-backed file
 // adapter; a future multi-user adapter (e.g. GitHub Issues/Projects for the
-// node shape) implements the same surface (design 0001, D2).
+// node shape) implements the same surface (design decision D2).
 //
 // Slice 1 is document operations only. Cross-machine sync (git pull/push,
 // merge=union, the singleton lock) is a later slice that wraps this adapter.

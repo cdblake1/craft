@@ -7,8 +7,9 @@
 // instance over the git-backed file adapter rooted at craft's data dir (the same
 // data root as the journal -- one adapter, both MCPs).
 //
-// Seven tools (design 0001, D4): compose_capture, compose_plan, compose_roadmap,
-// compose_link, compose_status, compose_tree, compose_rollup. Result text is
+// Nine tools (design decision D4): compose_capture, compose_plan, compose_roadmap,
+// compose_link, compose_unlink, compose_status, compose_update, compose_tree,
+// compose_rollup. Result text is
 // plaintext prose + a trailing fenced JSON block (the backlog convention);
 // structuredContent carries the same payload. stderr is diagnostics; stdout is
 // protocol-only.

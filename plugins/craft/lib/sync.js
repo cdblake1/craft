@@ -1,6 +1,6 @@
 'use strict';
 
-// sync.js -- cross-machine sync for the craft data root (design 0001, D2 sync).
+// sync.js -- cross-machine sync for the craft data root (design decision D2 sync).
 //
 // The data root is a git repo. Sync happens at session boundaries: pull at
 // start, commit + push at end. This is the proven fit for a single-user,

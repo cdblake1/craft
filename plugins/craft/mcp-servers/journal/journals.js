@@ -7,7 +7,7 @@
 // under `journals/<repo>/<branch...>/`; a journal leaf is a key prefix that
 // contains a `meta.json`. Pure logic (BM25, slugging, section extraction) is
 // unchanged from the validated copilot-tools implementation; only the IO
-// boundary moved to the adapter (design 0001, D5).
+// boundary moved to the adapter (design decision D5).
 
 const NS = 'journals';
 

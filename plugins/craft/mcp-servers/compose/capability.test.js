@@ -4,7 +4,7 @@
 // CAPABILITY (the compose MCP + the decompose discipline it enforces), as opposed
 // to the unit suites (function behavior) and fleet-conformance (the bridge
 // contract). It drives a full decompose lifecycle through the real MCP dispatch
-// and the real model + failure-capture, and asserts the invariants design 0001
+// and the real model + failure-capture, and asserts the invariants the design
 // promises the capability upholds. A change that quietly breaks one of these
 // (e.g. a roadmap growing a computed health number, the tool surface drifting,
 // a failure never surfacing for triage) fails here.
