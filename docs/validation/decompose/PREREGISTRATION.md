@@ -9,8 +9,8 @@ validation plan the capability owed (it previously had only function-level unit 
 
 - **The artifact:** `plugins/craft/mcp-servers/compose/` (the compose MCP: 9 tools, the node model,
   failure capture, the work-tree injection) and the `decompose` / `app-decompose` skills that drive it.
-- **The reference bar:** design `0001-foundation-and-work-composition.md`, decisions D3, D4, D6, D7 and
-  the cross-cutting concerns. These are the contract the capability claims to uphold.
+- **The reference bar:** the capability's design decisions D3, D4, D6, D7 and the cross-cutting
+  concerns (enumerated in the oracle table below). These are the contract the capability claims to uphold.
 
 ## Oracle: the capability invariants
 
@@ -18,7 +18,7 @@ The gate is the runnable end-to-end test
 `plugins/craft/mcp-servers/compose/capability.test.js`, which drives a full decompose lifecycle
 through the real MCP dispatch and the real model and asserts one invariant per design promise:
 
-| # | Invariant (from design 0001) | Oracle |
+| # | Invariant (design decision) | Oracle |
 |---|---|---|
 | D4 | A small, fixed, **described** tool surface (no dead-tool sprawl) | `tools/list` is exactly the documented 9-tool set, each with a description and an object input schema |
 | D3-a | Three levels with **enforced** parents | an item cannot link to a roadmap; a plan cannot link to a plan |

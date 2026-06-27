@@ -27,7 +27,7 @@ craft also ships standalone disciplines that compose with the pipeline rather th
 
 ## Architecture
 
-Everything addresses data through a single storage adapter (`lib/storage.js`), by a logical, slash-separated key, never the filesystem directly. The journal and compose MCPs and every hook share that one data layer, so persistence and cross-machine sync are solved once, in one place. The default backend is a git-backed directory; the interface is deliberately small so a future multi-user backend can replace it without rewriting the layers above. The full design is in [`docs/design/0001-foundation-and-work-composition.md`](docs/design/0001-foundation-and-work-composition.md).
+Everything addresses data through a single storage adapter (`lib/storage.js`), by a logical, slash-separated key, never the filesystem directly. The journal and compose MCPs and every hook share that one data layer, so persistence and cross-machine sync are solved once, in one place. The default backend is a git-backed directory; the interface is deliberately small so a future multi-user backend can replace it without rewriting the layers above.
 
 The hooks are where the value surfaces automatically:
 

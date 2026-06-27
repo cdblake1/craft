@@ -1,6 +1,6 @@
 'use strict';
 
-// failure.js -- trigger-based, fact-grounded failure capture (design 0001, D6).
+// failure.js -- trigger-based, fact-grounded failure capture (design decision D6).
 //
 // Two phases, two hook handlers, joined through the adapter:
 //   1. postToolUseFailure accumulates observable failure FACTS (tool, error

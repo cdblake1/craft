@@ -25,7 +25,7 @@ Supporting suites: `compose.test.js`, `server.test.js`, `failure.test.js`, `fron
 
 All seven capability invariants pass AND the full compose suite + stdio test are green.
 
-**Result: GATE PASSED. The decompose capability is validated against its design-0001 invariants.**
+**Result: GATE PASSED. The decompose capability is validated against its design invariants.**
 
 ## Scope and caveats
 

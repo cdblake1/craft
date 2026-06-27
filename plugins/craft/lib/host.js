@@ -26,7 +26,7 @@ function host() {
 }
 
 // The per-host home directory craft data lives under (~/.claude or ~/.copilot).
-// Per design 0001, craft data is per-host; this is the one place that choice is
+// Per the design, craft data is per-host; this is the one place that choice is
 // made. Specific roots (CRAFT_DATA_ROOT, COPILOT_SESSION_STATE_ROOT, etc.) still
 // override their own paths upstream of this helper.
 function hostHome() {
