@@ -24,6 +24,11 @@ const SERVER_NAME    = 'craft-compose';
 const SERVER_VERSION = '0.1.0';
 const PROTOCOL_VER   = '2024-11-05';
 
+// Cap the rendered TEXT of compose_tree so a large forest cannot blow the
+// agent's context. structuredContent always carries the full tree regardless;
+// only the human-readable text is summarized past this size.
+const TREE_TEXT_CAP = 8000;
+
 class ComposeError extends Error {
     constructor(verb, reason, fields) {
         super(`Failed to ${verb}: ${reason}`);
@@ -44,8 +49,8 @@ const TOOLS = [
       inputSchema: { type: 'object', properties: { id: { type: 'string' }, status: { type: 'string' }, notes: { type: 'string' }, next_action: { type: 'string' } }, required: ['id', 'status'], additionalProperties: false } },
     { name: 'compose_update', description: 'Edit an existing node\'s content fields in place (id, links, and status preserved). Item: title, severity, category, notes, next_action. Plan/roadmap: title, body. Status is changed via compose_status, not here. Validates against PII at write time.',
       inputSchema: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, severity: { type: 'string' }, category: { type: 'string' }, notes: { type: 'string' }, next_action: { type: 'string' } }, required: ['id'], additionalProperties: false } },
-    { name: 'compose_tree', description: 'Render the roadmap->plan->item tree (the unified view). With roadmap_id, return just that subtree; otherwise also surface unparented plans and loose items. Plan completion is computed live.',
-      inputSchema: { type: 'object', properties: { roadmap_id: { type: 'string' } }, additionalProperties: false } },
+    { name: 'compose_tree', description: 'Render the roadmap->plan->item tree (the unified view). With roadmap_id, return just that subtree; otherwise also surface unparented plans, loose items, and orphaned items. With status (a status or array of statuses), narrow the emitted items to those statuses (completion + counts still reflect every item). Plan completion is computed live.',
+      inputSchema: { type: 'object', properties: { roadmap_id: { type: 'string' }, status: { type: ['string', 'array'], items: { type: 'string' } } }, additionalProperties: false } },
     { name: 'compose_rollup', description: 'Recompute plan completion_pct from child item states and persist it. With plan_id, roll up one plan; otherwise roll up all plans. Deterministic count-based (shipped / non-dropped).',
       inputSchema: { type: 'object', properties: { plan_id: { type: 'string' } }, additionalProperties: false } },
 ];
@@ -159,7 +164,7 @@ function createServer(compose) {
             } catch (e) { throw new ComposeError(verb, e.message, []); }
         },
         compose_tree(args) {
-            try { return compose.tree({ roadmap_id: args.roadmap_id }); }
+            try { return compose.tree({ roadmap_id: args.roadmap_id, status: args.status }); }
             catch (e) { throw new ComposeError('render tree', e.message, []); }
         },
         compose_rollup(args) {
@@ -174,10 +179,26 @@ function createServer(compose) {
         },
     };
 
+    // Count plans + items across every bucket, for the oversized-tree summary.
+    function _treeTotals(result) {
+        let plans = 0, items = 0;
+        for (const r of result.roadmaps || []) {
+            plans += (r.plans || []).length;
+            for (const p of r.plans || []) { items += (p.items || []).length; }
+        }
+        for (const p of result.unparentedPlans || []) { plans += 1; items += (p.items || []).length; }
+        items += (result.looseItems || []).length + (result.orphanedItems || []).length;
+        return { plans, items };
+    }
+
     function format(name, args, result) {
         if (name === 'compose_tree') {
             const n = (result.roadmaps || []).length;
-            return withFencedJson(`compose tree: ${n} roadmap(s)`, result);
+            const full = withFencedJson(`compose tree: ${n} roadmap(s)`, result);
+            if (full.length <= TREE_TEXT_CAP) { return full; }
+            // Oversized: summarize the text (structuredContent still has it all).
+            const { plans, items } = _treeTotals(result);
+            return `compose tree (text summarized; full tree in structuredContent): ${n} roadmap(s), ${plans} plan(s), ${items} item(s). Narrow with a status filter (e.g. status: "open") or a roadmap_id.`;
         }
         if (name === 'compose_rollup') {
             const broken = (result.integrity || []).length;

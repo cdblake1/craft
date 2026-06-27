@@ -194,6 +194,58 @@ test('computePlanCompletion is shipped / (countable), dropped excluded', () => {
     assert.strictEqual(c.computePlanCompletion('NOPE'), 0);
 });
 
+test('compactItems collapses the item log to one line per item, view unchanged', () => {
+    const c = fresh();
+    const p = c.createPlan({ title: 'p' });
+    const a = c.createItem({ title: 'a', plan_id: p.id });
+    const b = c.createItem({ title: 'b', plan_id: p.id });
+    // churn: many status updates append many lines for the same two items.
+    for (const s of ['in-flight', 'shipped', 'in-flight', 'shipped']) { c.updateItemStatus(a.id, s); }
+    c.updateItemStatus(b.id, 'dropped');
+    const before = c.tree();
+    const res = c.compactItems();
+    assert.strictEqual(res.items, 2, 'two resolved items after compaction');
+    assert.ok(res.entriesBefore > 2, 'history had more entries than items');
+    // resolved view is identical after compaction
+    const after = c.tree();
+    assert.deepStrictEqual(after, before);
+    assert.strictEqual(c.getItem(a.id).status, 'shipped');
+    assert.strictEqual(c.getItem(b.id).status, 'dropped');
+    assert.strictEqual(c.computePlanCompletion(p.id), 100);   // a shipped, b dropped/excluded -> 1/1
+});
+
+test('rollupAll auto-compacts a bloated item log', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'craft-compose-'));
+    const store = createFileStore({ root: tmp });
+    const c = createCompose(store);
+    const p = c.createPlan({ title: 'p' });
+    const it = c.createItem({ title: 'a', plan_id: p.id });
+    for (let i = 0; i < 12; i++) { c.updateItemStatus(it.id, i % 2 ? 'in-flight' : 'open'); }
+    const linesBefore = store.read('compose/items.jsonl').trim().split(/\r?\n/).length;
+    assert.ok(linesBefore > 10, 'log was bloated before rollup');
+    c.rollupAll();
+    const linesAfter = store.read('compose/items.jsonl').trim().split(/\r?\n/).length;
+    assert.strictEqual(linesAfter, 1, 'rollupAll compacted the log to one line per item');
+    assert.strictEqual(c.getItem(it.id).title, 'a');   // identity survived compaction
+});
+
+test('tree status filter narrows emitted items but keeps completion + counts honest', () => {
+    const c = fresh();
+    const p = c.createPlan({ title: 'p' });
+    const a = c.createItem({ title: 'open one', plan_id: p.id });
+    const b = c.createItem({ title: 'shipped one', plan_id: p.id });
+    c.updateItemStatus(b.id, 'shipped');
+    const pn = c.tree({ status: 'open' }).unparentedPlans[0];
+    assert.strictEqual(pn.items.length, 1);                 // only the open item emitted
+    assert.strictEqual(pn.items[0].id, a.id);
+    assert.strictEqual(pn.completion_pct, 50);              // completion still from ALL items (1 of 2)
+    assert.strictEqual(pn.itemStatusCounts.shipped, 1);     // counts still reflect every item
+    assert.strictEqual(pn.itemStatusCounts.open, 1);
+    // array form
+    const both = c.tree({ status: ['open', 'shipped'] }).unparentedPlans[0];
+    assert.strictEqual(both.items.length, 2);
+});
+
 test('rollupPlan persists the computed completion_pct to the doc', () => {
     const c = fresh();
     const p = c.createPlan({ title: 'p' });

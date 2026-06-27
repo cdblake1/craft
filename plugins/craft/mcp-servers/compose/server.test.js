@@ -158,7 +158,29 @@ test('compose_rollup surfaces a link-integrity report for a dangling item link',
     assert.strictEqual(report.integrity[0].dangling_ref, 'GHOSTPLAN0000000000000000');
 });
 
-try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) { /* best effort */ }
+test('compose_tree status filter and the oversized-text size guard', () => {
+    const fresh = createServer(createCompose(createFileStore({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'craft-compose-srv3-')) })));
+    function scf(name, args) { return fresh.handleRequest({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name, arguments: args || {} } }); }
+    const pid = scf('compose_plan', { title: 'p' }).result.structuredContent.id;
+    const open = scf('compose_capture', { title: 'open one', plan_id: pid }).result.structuredContent.id;
+    const ship = scf('compose_capture', { title: 'shipped one', plan_id: pid }).result.structuredContent.id;
+    scf('compose_status', { id: ship, status: 'shipped' });
+
+    // status filter narrows the emitted items in structuredContent
+    const filtered = scf('compose_tree', { status: 'open' }).result.structuredContent;
+    const pn = filtered.unparentedPlans[0];
+    assert.strictEqual(pn.items.length, 1, JSON.stringify(pn.items));
+    assert.strictEqual(pn.items[0].id, open);
+    assert.strictEqual(pn.completion_pct, 50);   // still honest
+
+    // size guard: many items -> the TEXT is summarized, structuredContent stays full
+    for (let i = 0; i < 400; i++) { scf('compose_capture', { title: 'bulk item number ' + i + ' with some descriptive padding text', plan_id: pid }); }
+    const res = scf('compose_tree', {}).result;
+    assert.ok(/text summarized; full tree in structuredContent/.test(res.content[0].text), res.content[0].text.slice(0, 120));
+    assert.ok(res.structuredContent.unparentedPlans[0].items.length >= 400, 'structuredContent keeps the full tree');
+});
+
+
 
 process.stdout.write(`\nTotal: ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);
