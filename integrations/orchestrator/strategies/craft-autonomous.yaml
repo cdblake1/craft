@@ -25,15 +25,23 @@ spec_gate:
   fix_prompt_file: ../prompts/craft-spec-fix.md
   fix_max_iterations: 2
 
-# Post-build gate: run craft Local Code Review on the built change. A confirmed-red
-# denial drives a fix and re-review, up to the cap; an exhausted gate leaves the item
-# as a draft for a human (never auto-merged). Required, so it gates the verdict.
+# Post-build gates, run in order. First craft Local Code Review on the change; then a
+# live-dogfood gate that actually RUNS the assembled application end-to-end and confirms
+# the change is present and working in the running app (not just green in tests). Each is
+# required and deny-capable with a bounded fix loop; an exhausted gate leaves the item a
+# draft for a human (never auto-merged).
 checks:
   - type: agent
     name: code-review
     required: true
     prompt_file: ../prompts/craft-lcr-gate.md
     fix_prompt_file: ../prompts/craft-lcr-fix.md
+    fix_max_iterations: 2
+  - type: agent
+    name: dogfood
+    required: true
+    prompt_file: ../prompts/craft-dogfood-gate.md
+    fix_prompt_file: ../prompts/craft-dogfood-fix.md
     fix_max_iterations: 2
 
 # The planning spec is a build-time artifact; remove it before the PR to the base
