@@ -30,10 +30,27 @@ const CATALOG = [
         ],
         directive:
             'This looks like application-scale work. Do NOT one-pass it. Run the craft app-PM pipeline: '
-            + 'clarify-intent -> research -> product-spec (feature-complete + competitive matrix + wedge) '
+            + 'clarify-intent -> product-discovery (validate the problem + the four risks + the riskiest '
+            + 'assumption) -> research -> product-spec (feature-complete + competitive matrix + wedge) '
             + '+ uiux-design (flows, screens, wireframes, design system, a11y) -> app-decompose (one holistic '
-            + 'sequenced roadmap) -> drive (tested slices, coherence-checked back to the spec). Scope and design '
-            + 'before code.',
+            + 'sequenced roadmap) -> drive (tested slices, coherence-checked back to the spec) -> product-quality '
+            + '(assess the assembled product against the bar, rank gaps back into app-decompose) -> '
+            + 'release-readiness (run the validation plan, go/no-go). Scope and design before code; judge the '
+            + 'assembled product after.',
+    },
+    {
+        id: 'product-discovery',
+        title: 'Product discovery (validate before building)',
+        triggers: [
+            'product discovery', 'is this worth building', 'should we build', 'validate the idea',
+            'validate the problem', 'what problem are we solving', 'who is this for', 'opportunity assessment',
+            'four risks', 'four product risks', 'job to be done', 'jobs to be done', 'riskiest assumption',
+            'is this the right thing',
+        ],
+        directive:
+            'Use the product-discovery skill (upstream of product-spec): frame the problem as a job to be done, '
+            + 'read the four product risks (value, usability, feasibility, viability), name the riskiest '
+            + 'assumption + its cheapest test, and define success as outcomes. Validate the problem before the spec.',
     },
     {
         id: 'product-spec',
@@ -80,6 +97,34 @@ const CATALOG = [
         directive:
             'Use the drive skill: pull the next roadmap part, build it in tested vertical slices '
             + '(implementation), then coherence-check the result back to the spec + design before moving on.',
+    },
+    {
+        id: 'product-quality',
+        title: 'Product quality (assess the assembled product, rank gaps)',
+        triggers: [
+            'product quality', 'is the product good', 'is it actually good', 'what should we fix next',
+            'what to improve', 'quality assessment', 'quality pass', 'assess the product', 'assess the build',
+            'rank the gaps', 'prioritize the backlog', 'what is missing', 'holistic quality',
+        ],
+        directive:
+            'Use the product-quality skill (after slices land): define the quality bar first '
+            + '(goals-signals-metrics + the product-spec matrix + the uiux bar + the spec validation plan), score '
+            + 'the assembled product, find gaps by importance vs satisfaction, rank by impact over effort, and feed '
+            + 'the ranked list back into app-decompose as the next wave.',
+    },
+    {
+        id: 'release-readiness',
+        title: 'Release readiness (go/no-go)',
+        triggers: [
+            'release readiness', 'ready to ship', 'launch checklist', 'go/no-go', 'go no-go', 'launch gate',
+            'readiness review', 'production readiness', 'is it ready to ship', 'ship decision',
+            'definition of done for the whole',
+        ],
+        directive:
+            'Use the release-readiness skill (terminal gate): run the spec validation plan, check the launch bar '
+            + '(success measures, accessibility, security + privacy/no-PII, docs, rollout/rollback) scaled to the '
+            + 'build stage, render a readiness scorecard + a single go/no-go, and route a no-go back through '
+            + 'product-quality.',
     },
     {
         id: 'research',
@@ -195,11 +240,12 @@ function buildPromptDirective(text) {
 // so the skills are propagated even on a cold repo with no journal/compose data.
 function buildCatalogDirective() {
     const lines = [];
-    lines.push('[craft] Engineering-discipline skills are available. Match the work to a skill and load it '
-        + 'before improvising:');
-    lines.push('- Application-scale build: run the PM pipeline in order -- clarify-intent -> research -> '
-        + 'product-spec + uiux-design -> app-decompose -> drive. Scope and design heavily BEFORE code; do not '
-        + 'one-pass an app.');
+    lines.push('[craft] Engineering- and product-discipline skills are available. Match the work to a skill and '
+        + 'load it before improvising:');
+    lines.push('- Application-scale build: run the PM pipeline in order -- clarify-intent -> product-discovery -> '
+        + 'research -> product-spec + uiux-design -> app-decompose -> drive -> product-quality -> '
+        + 'release-readiness. Scope and design heavily BEFORE code; assess the assembled product against a bar '
+        + 'AFTER, and feed ranked gaps back into the roadmap. Do not one-pass an app.');
     lines.push('- Single change: implementation (aim -> design -> tested slices). Question first: clarify-intent. '
         + 'Find out: research. Prove empirically: experiment.');
     lines.push('- Structure work: app-decompose (whole validated spec) or decompose (one level at a time). '
