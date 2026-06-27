@@ -204,6 +204,39 @@ test('tree surfaces unparented plans and loose items at the top level', () => {
     assert.strictEqual(t.looseItems[0].title, 'loose item');
 });
 
+test('tree items carry links + prose (plan_id, roadmap_id, severity, notes, next_action) and plans carry body', () => {
+    const c = fresh();
+    const r = c.createRoadmap({ title: 'road' });
+    const p = c.createPlan({ title: 'plan', parent_id: r.id, body: 'shared context for children' });
+    c.createItem({
+        title: 'leaf', plan_id: p.id, category: 'feature', severity: 'high',
+        notes: 'supporting context', next_action: 'do the concrete thing',
+    });
+    const pn = c.tree().roadmaps[0].plans[0];
+    assert.strictEqual(pn.body.trim(), 'shared context for children');   // plan prose emitted
+    const it = pn.items[0];
+    assert.strictEqual(it.plan_id, p.id);
+    assert.strictEqual(it.roadmap_id, r.id);                       // denormalized from the plan's parent
+    assert.strictEqual(it.severity, 'high');
+    assert.strictEqual(it.notes, 'supporting context');
+    assert.strictEqual(it.next_action, 'do the concrete thing');
+    assert.strictEqual(it.category, 'feature');
+});
+
+test('tree resolves roadmap_id to null for a loose item and an item under an unparented plan', () => {
+    const c = fresh();
+    const orphanPlan = c.createPlan({ title: 'no roadmap' });      // parent_id null
+    c.createItem({ title: 'under orphan plan', plan_id: orphanPlan.id, next_action: 'x' });
+    c.createItem({ title: 'truly loose' });                        // no plan_id
+    const t = c.tree();
+    const underOrphan = t.unparentedPlans[0].items[0];
+    assert.strictEqual(underOrphan.plan_id, orphanPlan.id);
+    assert.strictEqual(underOrphan.roadmap_id, null);              // plan has no roadmap
+    const loose = t.looseItems[0];
+    assert.strictEqual(loose.plan_id, null);
+    assert.strictEqual(loose.roadmap_id, null);
+});
+
 test('tree with a roadmap_id returns just that subtree', () => {
     const c = fresh();
     const r1 = c.createRoadmap({ title: 'r1' });
