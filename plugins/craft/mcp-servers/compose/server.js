@@ -165,8 +165,11 @@ function createServer(compose) {
         compose_rollup(args) {
             const verb = 'roll up';
             try {
-                if (args.plan_id) { return { success: true, rolled_up: [{ id: args.plan_id, completion_pct: compose.rollupPlan(args.plan_id) }] }; }
-                return { success: true, rolled_up: compose.rollupAll() };
+                // Surface the link-integrity report alongside the roll-up (D3:
+                // the integrity check runs in the rollup path). Reports only.
+                const integrity = compose.checkLinkIntegrity();
+                if (args.plan_id) { return { success: true, rolled_up: [{ id: args.plan_id, completion_pct: compose.rollupPlan(args.plan_id) }], integrity }; }
+                return { success: true, rolled_up: compose.rollupAll(), integrity };
             } catch (e) { throw new ComposeError(verb, e.message, []); }
         },
     };
@@ -177,7 +180,9 @@ function createServer(compose) {
             return withFencedJson(`compose tree: ${n} roadmap(s)`, result);
         }
         if (name === 'compose_rollup') {
-            return withFencedJson(`rolled up ${result.rolled_up.length} plan(s)`, result);
+            const broken = (result.integrity || []).length;
+            const suffix = broken ? `; ${broken} broken link(s)` : '';
+            return withFencedJson(`rolled up ${result.rolled_up.length} plan(s)${suffix}`, result);
         }
         if (result && result.id) { return withFencedJson(`${name} -> ${result.type} ${result.id}`, result); }
         return withFencedJson(`${name} succeeded`, result);

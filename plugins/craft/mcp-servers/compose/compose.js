@@ -338,6 +338,27 @@ function createCompose(store) {
         return listPlans().map(p => ({ id: p.id, completion_pct: rollupPlan(p.id) }));
     }
 
+    // Report broken parent links across the tree (D3: a link-integrity check
+    // runs in the rollup path). An item whose plan_id has no plan, or a plan
+    // whose parent_id has no roadmap, is dangling. Reports only -- never
+    // auto-deletes or auto-reparents. Returns [{ id, type, dangling_ref }].
+    function checkLinkIntegrity() {
+        const planIds = new Set(listPlans().map(p => p.id));
+        const roadmapIds = new Set(listRoadmaps().map(r => r.id));
+        const broken = [];
+        for (const it of listItems()) {
+            if (it.plan_id && !planIds.has(it.plan_id)) {
+                broken.push({ id: it.id, type: 'item', dangling_ref: it.plan_id });
+            }
+        }
+        for (const p of listPlans()) {
+            if (p.parent_id && !roadmapIds.has(p.parent_id)) {
+                broken.push({ id: p.id, type: 'plan', dangling_ref: p.parent_id });
+            }
+        }
+        return broken;
+    }
+
     // Assemble the roadmap -> plan -> item tree. Plan completion is computed live
     // so the tree is always current even if a plan's persisted completion_pct is
     // stale. Roadmaps carry child status COUNTS only, never a computed health
@@ -345,15 +366,19 @@ function createCompose(store) {
     // prose `body`; each item node carries its links (plan_id, roadmap_id) and
     // prose (severity, notes, next_action) so a consumer can act on a leaf from
     // the tree alone. With opts.roadmap_id, return just that subtree; otherwise
-    // also surface unparented plans and loose items.
+    // also surface unparented plans, loose items, and orphaned items (a plan_id
+    // that points at a missing plan -- never silently dropped).
     function tree(opts) {
         opts = opts || {};
+
+        const plans = listPlans();
+        const planIds = new Set(plans.map(p => p.id));
 
         // plan_id -> parent roadmap id, so an item can carry a denormalized
         // roadmap_id (its plan's parent). A plan with no parent, or an item with
         // no plan, resolves to null.
         const planRoadmap = new Map();
-        for (const p of listPlans()) { planRoadmap.set(p.id, p.parent_id || null); }
+        for (const p of plans) { planRoadmap.set(p.id, p.parent_id || null); }
 
         // The emitted item shape. Beyond the display basics (title/status/
         // category) it carries the fields a consumer needs to act on a leaf:
@@ -373,11 +398,16 @@ function createCompose(store) {
 
         const itemsByPlan = new Map();
         const looseItems = [];
+        const orphanedItems = [];
         for (const it of listItems()) {
-            if (it.plan_id) {
+            if (it.plan_id && planIds.has(it.plan_id)) {
                 if (!itemsByPlan.has(it.plan_id)) { itemsByPlan.set(it.plan_id, []); }
                 itemsByPlan.get(it.plan_id).push(it);
-            } else { looseItems.push(it); }
+            } else if (it.plan_id) {
+                orphanedItems.push(it);   // plan_id set but the plan is gone -- dangling
+            } else {
+                looseItems.push(it);
+            }
         }
 
         function planNode(p) {
@@ -393,7 +423,7 @@ function createCompose(store) {
 
         const plansByRoadmap = new Map();
         const unparentedPlans = [];
-        for (const p of listPlans()) {
+        for (const p of plans) {
             if (p.parent_id) {
                 if (!plansByRoadmap.has(p.parent_id)) { plansByRoadmap.set(p.parent_id, []); }
                 plansByRoadmap.get(p.parent_id).push(p);
@@ -416,6 +446,9 @@ function createCompose(store) {
         if (!opts.roadmap_id) {
             result.unparentedPlans = unparentedPlans.map(planNode);
             result.looseItems = looseItems.map(itemNode);
+            // Orphans keep their dangling plan_id (itemNode emits it) so the
+            // broken link stays visible; roadmap_id resolves to null.
+            result.orphanedItems = orphanedItems.map(itemNode);
         }
         return result;
     }
@@ -470,7 +503,7 @@ function createCompose(store) {
         createPlan, getPlan, listPlans, updatePlanStatus, updatePlanFields,
         createRoadmap, getRoadmap, listRoadmaps, updateRoadmapStatus, updateRoadmapFields,
         getNode, link,
-        computePlanCompletion, rollupPlan, rollupAll, tree,
+        computePlanCompletion, rollupPlan, rollupAll, checkLinkIntegrity, tree,
         buildWorkTreeInjection,
     };
 }
