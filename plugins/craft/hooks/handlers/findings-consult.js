@@ -9,6 +9,7 @@
 // never resolves git (ctx.gitInfo is intentionally not called here).
 
 const { isFindingPath } = require('../../mcp-servers/journal/signal');
+const path = require('path');
 
 const TOOL_NAME_FIELDS = ['toolName', 'tool_name', 'name', 'tool'];
 const PATH_FIELDS = ['path', 'file_path', 'filePath', 'file', 'target_file', 'targetFile', 'target'];
@@ -67,6 +68,15 @@ module.exports = {
             const p = _extractPath(payload);
             if (!isFindingPath(p)) { return null; }
             ctx.stack.signal.logConsult({ sessionId: ctx.sessionId, path: p });
+            // P4: feed the consult into the finding's metadata so usageAdjust can
+            // boost findings that actually get opened (the measured loop -> ranking).
+            try {
+                const root = ctx.stack && ctx.stack.root;
+                if (root) {
+                    const key = path.relative(root, p).replace(/\\/g, '/');
+                    if (key && key.indexOf('..') !== 0) { ctx.stack.journals.recordConsult(key); }
+                }
+            } catch (_) { /* metadata update is best-effort */ }
         } catch (_) { /* postToolUse handlers must never fail the tool call */ }
         return null;
     },

@@ -82,6 +82,41 @@ test('seedDraftFromSession returns null for a branch with no journal', () => {
     assert.strictEqual(res, null);
 });
 
+// --- P3: self-feeding capture (auto-promote high-confidence seeds) ---
+const OV_LONG = 'This session established that the draft-seeder confidence gate auto-promotes a substantive checkpoint overview directly into the retrievable findings corpus, so the next session surfaces it without any manual human promotion step, which fixes the starved-corpus problem.';
+const sessHi = writeSession('sessHi', 'Auto-promote substantive seeds', OV_LONG);
+
+test('a high-confidence seed is promoted into findings/ (not _drafts/)', () => {
+    const before = journals.countDraftFindings('dev/test/A', 'repo');
+    const res = seeder.seedDraftFromSession({ branch: 'dev/test/A', repo: 'repo', sessionDir: sessHi, sessionId: 'sessHi' });
+    assert.ok(res && res.created === true && res.promoted === true, JSON.stringify(res));
+    assert.ok(/\/findings\/\d{2}-auto-promote-substantive-seeds\.md$/.test(res.key), res.key);
+    assert.ok(res.key.indexOf('/_drafts/') === -1, 'must not be a draft');
+    assert.strictEqual(journals.countDraftFindings('dev/test/A', 'repo'), before, 'draft count unchanged');
+});
+
+test('a promoted seed is retrievable by find_findings with no human step', () => {
+    const r = journals.findFindings('auto-promote substantive corpus');
+    const hit = r.find(x => x.key.endsWith('auto-promote-substantive-seeds.md'));
+    assert.ok(hit, 'promoted finding is retrievable');
+    assert.strictEqual(hit.status, 'active');
+    assert.strictEqual(hit.scope, 'branch');
+    const f = journals.getFinding(hit.key);
+    assert.ok(f.when_to_read && f.when_to_read.length > 10, 'a When-to-read hint was derived');
+});
+
+test('promotion is idempotent (content-hash dedup across findings/ + _drafts/)', () => {
+    const res = seeder.seedDraftFromSession({ branch: 'dev/test/A', repo: 'repo', sessionDir: sessHi, sessionId: 'sessHi' });
+    assert.ok(res && res.created === false, JSON.stringify(res));
+});
+
+test('autoPromote:false forces the draft path even for a substantive seed', () => {
+    const sessHi2 = writeSession('sessHi2', 'Forced draft path', OV_LONG + ' Extra unique tail to change the hash xyzzy.');
+    const res = seeder.seedDraftFromSession({ branch: 'dev/test/A', repo: 'repo', sessionDir: sessHi2, sessionId: 'sessHi2', autoPromote: false });
+    assert.ok(res && res.created === true && res.promoted === false, JSON.stringify(res));
+    assert.ok(res.key.indexOf('/_drafts/') !== -1, res.key);
+});
+
 delete process.env.COPILOT_SESSION_STATE_ROOT;
 fs.rmSync(tmp, { recursive: true, force: true });
 fs.rmSync(ssRoot, { recursive: true, force: true });
