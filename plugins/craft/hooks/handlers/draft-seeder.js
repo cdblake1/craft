@@ -40,7 +40,7 @@ module.exports = {
             sessionId: ctx.sessionId,
         });
         if (res && res.created && res.key) {
-            process.stderr.write('[draft-seeder] seeded ' + res.key + '\n');
+            process.stderr.write('[draft-seeder] ' + (res.promoted ? 'auto-promoted finding ' : 'seeded draft ') + res.key + '\n');
         }
         return null;
     },

@@ -37,7 +37,7 @@ try {
     foreach ($l in $lines) { if ($l.Trim()) { $o = $l | ConvertFrom-Json; $byId[[int]$o.id] = $o } }
 
     Check ($byId[1].result.serverInfo.name -eq 'craft-journal') "initialize returns craft-journal"
-    Check ($byId[2].result.tools.Count -eq 9) "tools/list returns 9 tools"
+    Check ($byId[2].result.tools.Count -eq 15) "tools/list returns 15 tools"
     Check ($byId[3].result.structuredContent.count -ge 1) "find_findings returns a hit over stdio"
     Check ($byId[3].result.structuredContent.findings[0].key -match 'findings/01-atomic\.md$') "result carries a logical adapter key"
 } finally {

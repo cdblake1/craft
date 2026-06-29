@@ -14,6 +14,8 @@ const readline = require('readline');
 
 const { createFileStore } = require('../../lib/storage');
 const { createJournals } = require('./journals');
+const { createResume } = require('./resume');
+const sessionState = require('./sessionState');
 const { defaultDataRoot } = require('./dataRoot');
 
 const SERVER_NAME    = 'craft-journal';
@@ -28,6 +30,8 @@ class JournalError extends Error {
 }
 
 const TOOLS = [
+    { name: 'journal_resume', description: 'ONE-CALL ORIENT: the assembled, token-budgeted resume block for a branch (where we left off + current plan + relevance/usage-ranked prior findings + what needs attention). Call this FIRST when picking up work on a branch. Lowest-priority sections drop under budget and the block says what it dropped.',
+      inputSchema: { type: 'object', properties: { branch: { type: 'string' }, repo: { type: 'string' } }, required: ['branch'], additionalProperties: false } },
     { name: 'journal_list', description: 'Enumerate journals across all repos. Per-branch summary with finding/step-log counts.',
       inputSchema: { type: 'object', properties: { repo: { type: 'string' }, branch_prefix: { type: 'string' } }, additionalProperties: false } },
     { name: 'journal_get', description: 'Full read of one journal: README + current-plan + finding/step-log lists.',
@@ -40,12 +44,22 @@ const TOOLS = [
       inputSchema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'], additionalProperties: false } },
     { name: 'journal_recent', description: 'Chronological feed of recent step-log entries across branches, newest first.',
       inputSchema: { type: 'object', properties: { days_back: { type: 'integer' }, repo: { type: 'string' } }, additionalProperties: false } },
-    { name: 'journal_create_finding', description: 'Create a finding in a branch journal. Numbered prefix auto-assigned; body must have an H1. Warns (does not block) on a near-identical existing title. Capture durable, reusable lessons at the end of a task.',
-      inputSchema: { type: 'object', properties: { branch: { type: 'string' }, repo: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' } }, required: ['branch', 'title', 'body'], additionalProperties: false } },
+    { name: 'journal_create_finding', description: 'Create a finding in a branch journal. Numbered prefix auto-assigned; body must have an H1. Warns (does not block) on a near-identical existing title. Capture durable, reusable lessons at the end of a task. Optional scope: branch (default), repo (surfaces on every branch of the repo), or user (surfaces across repos).',
+      inputSchema: { type: 'object', properties: { branch: { type: 'string' }, repo: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, scope: { type: 'string', enum: ['branch', 'repo', 'user'] } }, required: ['branch', 'title', 'body'], additionalProperties: false } },
     { name: 'journal_append_step_log', description: 'Append to today\'s step-log file. Creates it on first call; adds a timestamped subheading on later calls.',
       inputSchema: { type: 'object', properties: { branch: { type: 'string' }, repo: { type: 'string' }, content: { type: 'string' } }, required: ['branch', 'content'], additionalProperties: false } },
     { name: 'journal_update_current_plan', description: 'Replace the current-plan body. Atomic; last-write-wins on concurrent calls.',
       inputSchema: { type: 'object', properties: { branch: { type: 'string' }, repo: { type: 'string' }, content: { type: 'string' } }, required: ['branch', 'content'], additionalProperties: false } },
+    { name: 'journal_supersede_finding', description: 'Mark a finding superseded by a newer one (old_path), linking old<->new. The superseded finding drops out of default retrieval but stays on disk. Use when a newer finding replaces an older lesson.',
+      inputSchema: { type: 'object', properties: { old_path: { type: 'string' }, new_path: { type: 'string' } }, required: ['old_path'], additionalProperties: false } },
+    { name: 'journal_retire_finding', description: 'Soft-delete a finding (status retired): it drops out of default retrieval but remains on disk and is reversible. Use for a stale or wrong finding.',
+      inputSchema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'], additionalProperties: false } },
+    { name: 'journal_update_finding', description: 'Correct a finding in place with a new body; preserves its metadata (scope/status/consults/links) and archives the prior version under findings/_history/. Body must have an H1.',
+      inputSchema: { type: 'object', properties: { path: { type: 'string' }, body: { type: 'string' } }, required: ['path', 'body'], additionalProperties: false } },
+    { name: 'journal_list_stale', description: 'Curation queue: findings that need a human decision (superseded, retired, stale, or gone cold). Feed these to journal_retire_finding / journal_supersede_finding / journal_update_finding. Set include_never_consulted to also surface findings never opened.',
+      inputSchema: { type: 'object', properties: { repo: { type: 'string' }, include_never_consulted: { type: 'boolean' } }, additionalProperties: false } },
+    { name: 'journal_link_finding', description: 'Add typed relationship links from a finding to related finding/plan/step-log keys (merged, deduped). Surfaced by journal_get_finding and journal_resume.',
+      inputSchema: { type: 'object', properties: { path: { type: 'string' }, relates_to: { type: 'array', items: { type: 'string' } } }, required: ['path', 'relates_to'], additionalProperties: false } },
 ];
 
 function _reqStr(args, field, verb) {
@@ -64,9 +78,19 @@ function formatErrorMessage(verb, reason, fields) {
     return out;
 }
 
-// createServer binds tool handlers + dispatch to a journals instance.
-function createServer(journals) {
+// createServer binds tool handlers + dispatch to a journals instance. An optional
+// deps.resume composer powers journal_resume; one is built by default.
+function createServer(journals, deps) {
+    const resume = (deps && deps.resume) || createResume({ journals, sessionState });
     const tools = {
+        journal_resume(args) {
+            _reqStr(args, 'branch', 'resume');
+            const inj = resume.buildResumeInjection({ branch: args.branch, repo: args.repo });
+            if (!inj || !inj.text) {
+                return { branch: args.branch, repo: args.repo || null, text: null, sections: [], dropped: [], message: 'No resume context yet for this branch (no recap, plan, or prior findings).' };
+            }
+            return { branch: args.branch, repo: args.repo || null, text: inj.text, sections: inj.sections, dropped: inj.dropped || [] };
+        },
         journal_list(args) {
             const all = journals.listAll().filter(j =>
                 (!args.repo || j.repo === args.repo) &&
@@ -106,8 +130,8 @@ function createServer(journals) {
             _reqStr(args, 'branch', verb); _reqStr(args, 'title', verb); _reqStr(args, 'body', verb);
             try {
                 const similar = journals.findSimilarFindings(args.title);
-                const key = journals.createFinding(args.branch, args.repo, args.title, args.body);
-                const out = { success: true, key, branch: args.branch, repo: args.repo || null, title: args.title };
+                const key = journals.createFinding(args.branch, args.repo, args.title, args.body, { scope: args.scope });
+                const out = { success: true, key, branch: args.branch, repo: args.repo || null, title: args.title, scope: args.scope || 'branch' };
                 if (similar.length) {
                     out.duplicate_warning = { message: `${similar.length} existing finding(s) have a very similar title; consider whether this duplicates one of them.`, similar: similar.slice(0, 3) };
                 }
@@ -125,6 +149,37 @@ function createServer(journals) {
             _reqStr(args, 'branch', verb);
             if (typeof args.content !== 'string') { throw new JournalError(verb, 'content is required (string)', [['field', 'content']]); }
             try { return { success: true, key: journals.updateCurrentPlan(args.branch, args.repo, args.content), branch: args.branch, repo: args.repo || null, length: args.content.length }; }
+            catch (e) { throw new JournalError(verb, e.message, []); }
+        },
+        journal_supersede_finding(args) {
+            const verb = 'supersede finding';
+            _reqStr(args, 'old_path', verb);
+            try { return Object.assign({ success: true }, journals.supersedeFinding(args.old_path, args.new_path)); }
+            catch (e) { throw new JournalError(verb, e.message, []); }
+        },
+        journal_retire_finding(args) {
+            const verb = 'retire finding';
+            _reqStr(args, 'path', verb);
+            try { return Object.assign({ success: true }, journals.retireFinding(args.path)); }
+            catch (e) { throw new JournalError(verb, e.message, []); }
+        },
+        journal_update_finding(args) {
+            const verb = 'update finding';
+            _reqStr(args, 'path', verb); _reqStr(args, 'body', verb);
+            try { return Object.assign({ success: true }, journals.updateFinding(args.path, args.body)); }
+            catch (e) { throw new JournalError(verb, e.message, []); }
+        },
+        journal_list_stale(args) {
+            const rows = journals.listStale({ repo: args.repo, includeNeverConsulted: !!args.include_never_consulted });
+            const out = { count: rows.length, stale: rows };
+            if (rows.length === 0) { out.message = 'Nothing to curate: no stale, superseded, retired, or cold findings.'; }
+            return out;
+        },
+        journal_link_finding(args) {
+            const verb = 'link finding';
+            _reqStr(args, 'path', verb);
+            if (!Array.isArray(args.relates_to)) { throw new JournalError(verb, 'relates_to is required (array of keys)', [['field', 'relates_to']]); }
+            try { return Object.assign({ success: true }, journals.linkFinding(args.path, args.relates_to)); }
             catch (e) { throw new JournalError(verb, e.message, []); }
         },
     };

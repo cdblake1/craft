@@ -42,13 +42,23 @@ function createResume(deps) {
 
         const sections = [];
 
-        // 1. Where we left off.
+        // 1. Where we left off. Prefer the journal-owned recap (synced across
+        // machines); fall back to the host session-state (local-only) when the
+        // journal has no recap yet.
         let recap = null;
         try {
-            recap = sessionState.buildLastSessionRecap({
-                gitRoot, cwd, excludeSessionId, rootOverride: opts.sessionStateRoot,
-            });
+            const jr = journals.getRecap(branch, repo);
+            if (jr && (jr.overview || jr.title)) {
+                recap = { title: jr.title, name: jr.title, overview: jr.overview, updatedAt: jr.updatedAt };
+            }
         } catch (_) { recap = null; }
+        if (!recap) {
+            try {
+                recap = sessionState.buildLastSessionRecap({
+                    gitRoot, cwd, excludeSessionId, rootOverride: opts.sessionStateRoot,
+                });
+            } catch (_) { recap = null; }
+        }
         if (recap && (recap.overview || recap.title || recap.name)) {
             const head = recap.title || recap.name || 'previous session';
             const when = recap.updatedAt ? ` (last active ${recap.updatedAt})` : '';
@@ -82,23 +92,46 @@ function createResume(deps) {
             findings = findingsBlock.items || [];
         }
 
-        // 4. Draft findings awaiting promotion.
+        // 4. Needs your attention: drafts awaiting promotion + stale findings.
         let draftCount = 0;
         try { draftCount = journals.countDraftFindings(branch, repo); } catch (_) { draftCount = 0; }
-        if (draftCount > 0) {
-            sections.push({
-                key: 'drafts',
-                text: '## Draft findings awaiting promotion\n\n' + draftCount +
-                    ' draft finding(s) seeded from past sessions are waiting in this branch\'s ' +
-                    'findings/_drafts/. Review them and move the good ones into findings/ so future sessions surface them.',
-            });
+        let staleCount = 0;
+        try { staleCount = (findingsBlock && findingsBlock.staleCount) || 0; } catch (_) { staleCount = 0; }
+        if (draftCount > 0 || staleCount > 0) {
+            const bullets = [];
+            if (draftCount > 0) {
+                bullets.push('- ' + draftCount + ' draft finding(s) in findings/_drafts/ awaiting promotion (review and move the good ones into findings/).');
+            }
+            if (staleCount > 0) {
+                bullets.push('- ' + staleCount + ' finding(s) flagged stale or superseded (use journal_list_stale to curate).');
+            }
+            sections.push({ key: 'attention', text: '## Needs your attention\n\n' + bullets.join('\n') });
         }
 
         if (sections.length === 0) { return null; }
 
-        let text = '# Resume context (journal)\n\n' + sections.map(s => s.text).join('\n\n');
+        // Budget-aware assembly (P8): drop whole low-priority sections before a
+        // blunt truncation, and state what was dropped. Lower priority number =
+        // kept longer. Display order stays recap -> plan -> findings -> attention.
+        const PRIORITY = { plan: 1, findings: 2, recap: 3, attention: 4, drafts: 4 };
+        const header = '# Resume context (journal)';
+        const total = (arr) => header.length + 2 + arr.map(s => s.text).join('\n\n').length;
+        let kept = sections.slice();
+        const dropped = [];
+        while (kept.length > 1 && total(kept) > charCap) {
+            let idx = 0;
+            for (let i = 1; i < kept.length; i++) {
+                if ((PRIORITY[kept[i].key] || 5) >= (PRIORITY[kept[idx].key] || 5)) { idx = i; }
+            }
+            dropped.push(kept[idx].key);
+            kept.splice(idx, 1);
+        }
+        if (dropped.indexOf('findings') !== -1) { findings = []; }
+
+        let text = header + '\n\n' + kept.map(s => s.text).join('\n\n');
+        if (dropped.length) { text += '\n\n_Dropped under budget: ' + dropped.join(', ') + '._'; }
         if (text.length > charCap) { text = text.substring(0, charCap - 16).trim() + '\n\n_..truncated._'; }
-        return { text, sections: sections.map(s => s.key), hasRecap: !!recap, findings };
+        return { text, sections: kept.map(s => s.key), dropped, hasRecap: !!recap, findings };
     }
 
     return { buildResumeInjection };

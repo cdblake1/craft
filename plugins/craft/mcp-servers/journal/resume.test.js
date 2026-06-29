@@ -77,6 +77,22 @@ test('buildResumeInjection returns null when nothing is available', () => {
     assert.strictEqual(inj, null);
 });
 
+// --- P6: journal-owned recap takes precedence over host session-state ---
+test('saveRecap/getRecap round-trip', () => {
+    const key = journals.saveRecap('dev/test/A', 'repo', { title: 'Journal-owned recap', overview: 'persisted into the journal so it syncs', sessionId: 's1' });
+    assert.ok(/\/recap\.json$/.test(key));
+    const got = journals.getRecap('dev/test/A', 'repo');
+    assert.strictEqual(got.title, 'Journal-owned recap');
+});
+test('resume prefers the journal recap over host session-state', () => {
+    journals.saveRecap('dev/test/A', 'repo', { title: 'Journal-owned recap', overview: 'persisted into the journal so it syncs across machines', sessionId: 's1' });
+    const inj = resume.buildResumeInjection({
+        branch: 'dev/test/A', repo: 'repo', gitRoot: GR, excludeSessionId: 'CURRENT', minScore: 0.1,
+    });
+    assert.ok(inj.text.includes('Journal-owned recap'), 'journal recap used');
+    assert.ok(!inj.text.includes('Newest work'), 'host recap not used when journal recap exists');
+});
+
 delete process.env.COPILOT_SESSION_STATE_ROOT;
 fs.rmSync(tmp, { recursive: true, force: true });
 fs.rmSync(ssRoot, { recursive: true, force: true });

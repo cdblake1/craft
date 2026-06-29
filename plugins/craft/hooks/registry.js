@@ -12,6 +12,7 @@ const workTreeInjector = require('./handlers/work-tree-injector');
 const skillCatalogInjector = require('./handlers/skill-catalog-injector');
 const skillRouter = require('./handlers/skill-router');
 const draftSeeder = require('./handlers/draft-seeder');
+const recapWriter = require('./handlers/recap-writer');
 const findingsConsult = require('./handlers/findings-consult');
 const failureRecord = require('./handlers/failure-record');
 const failureCapture = require('./handlers/failure-capture');
@@ -30,5 +31,5 @@ module.exports = {
     userPromptSubmitted: [skillRouter],
     postToolUse: [findingsConsult],
     postToolUseFailure: [failureRecord],
-    sessionEnd: [draftSeeder, failureCapture, syncPush],
+    sessionEnd: [draftSeeder, recapWriter, failureCapture, syncPush],
 };
