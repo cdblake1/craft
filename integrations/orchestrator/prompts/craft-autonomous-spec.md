@@ -43,6 +43,17 @@ Write the human-readable spec/design that justifies the plan to `.craft-spec/SPE
 spec-review gate and is stripped from the final pull request, so put planning context
 there, not in the product tree. Do not write spec or design docs anywhere else.
 
+You explored the codebase to write this plan. Capture that understanding ONCE so each
+phase does not have to rediscover it: write a COMPACT codebase map to
+`.craft-spec/CODEBASE-MAP.md`. Keep it short and STRUCTURAL (facts that stay true across
+the whole feature), not a file dump. Include: the architecture and the key directories,
+the few files each phase will touch and what role they play, the project's conventions
+(language, framework, naming, test layout), the build and test commands, and for each
+phase the concrete integration "slot" it plugs into (the type/method/region where its
+change lands). Do NOT include line numbers or large code excerpts; those go stale and a
+phase agent reads the actual file before editing it. This map is a planning artifact like
+SPEC.md and is stripped before the pull request, so it never ships in the product tree.
+
 Branch discipline (important): commit all of your work directly on the CURRENT branch.
 Do NOT create a new branch, switch branches, push, or open a pull request. The
 orchestrator prepared the branch and handles push and PR; if you create your own

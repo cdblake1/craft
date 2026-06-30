@@ -4,6 +4,14 @@ Phase "{{phaseId}}" - {{phaseTitle}}
 
 {{phasePrompt}}
 
+Orient before you explore: the planner captured a compact codebase map at
+`.craft-spec/CODEBASE-MAP.md` (architecture, key files and their roles, conventions,
+build/test commands, and the integration slot this phase plugs into). Read it FIRST and
+use it to go straight to the files this phase touches. Do not re-survey the whole
+codebase; read only the specific files you are about to change (and confirm their current
+contents, since earlier phases have edited them). If the map is missing or a needed detail
+is absent, fall back to targeted exploration.
+
 Build this phase with the craft delivery discipline (the `implementation` / `drive`
 skills): it is one thin vertical slice. Work test-first: write the failing test,
 implement until it passes, and keep the whole suite green; never accumulate untested
